@@ -29,8 +29,8 @@ github_user:
 
 module_path:
   type: str
-  help: "Go module path"
   default: "github.com/{{ github_user }}/{{ project_name }}"
+  when: false
 
 go_version:
   type: str
@@ -39,8 +39,8 @@ go_version:
 
 author_name:
   type: str
-  help: "Author name (used in LICENSE)"
   default: "{{ github_user }}"
+  when: false
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Project type
@@ -60,8 +60,8 @@ project_type:
 
 domain_names:
   type: str
-  help: "Cenário package names, comma-separated (e.g. goroutines,channels,selects,contexts,transfers,deposits)"
-  default: "goroutines,channels,selects,contexts"
+  help: "Scenario package names, comma-separated (leave empty to add later, e.g. goroutines,channels,selects,contexts)"
+  default: ""
   when: "{{ project_type == 'study-tutorial' }}"
 
 study_entrypoint:

@@ -24,7 +24,7 @@ docker compose up -d
 {% if project_type == 'library' -%}
 Flat library layout. Public API at the root, internal packages under `internal/`.
 {% elif project_type == 'study-tutorial' -%}
-Cenário-named packages, each runnable and testable independently:
+Scenario-named packages, each runnable and testable independently:
 
 ```
 {% if study_entrypoint == 'cli' -%}

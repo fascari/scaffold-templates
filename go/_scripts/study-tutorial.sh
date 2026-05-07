@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-DOMAINS=$(echo "$DOMAIN_NAMES" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$')
+DOMAINS=$(echo "$DOMAIN_NAMES" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | { grep -v '^$' || true; })
 
 # Per-domain packages: internal/<name>/<name>.go + <name>_test.go
 for name in $DOMAINS; do
@@ -176,6 +176,7 @@ func main() {
 	}
 
 	ctx := context.Background()
+	_ = ctx
 	switch *pattern {
 ${CASES}	default:
 		log.Fatalf("unknown pattern: %q", *pattern)
