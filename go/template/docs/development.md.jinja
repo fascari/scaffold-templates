@@ -1,0 +1,154 @@
+{% if is_service -%}
+# Development Guide
+
+## Prerequisites
+
+- Go {{ go_version }}+
+- Docker & Docker Compose
+{% if include_db -%}
+- mise (for task runner)
+- atlas CLI
+{% endif -%}
+
+## First Time Setup
+
+1. **Clone the repo**
+```bash
+git clone <repo-url>
+cd {{ project_name }}
+```
+
+2. **Copy environment file**
+```bash
+cp .env.example .env
+```
+
+3. **Install dependencies**
+```bash
+go mod download
+```
+{% if include_db %}
+
+4. **Start infrastructure**
+```bash
+mise run up
+```
+
+5. **Apply migrations**
+```bash
+mise run db:migrate
+```
+{% endif %}
+
+## Running Locally
+
+{% if include_db -%}
+Start the service (waits for postgres):
+{% else -%}
+Start the service:
+{% endif -%}
+```bash
+mise run run
+```
+
+The API will be available at `http://localhost:8080`.
+
+## Docker Compose Layout
+
+{% if include_dockerfile -%}
+```yaml
+services:
+  postgres:       # Port 15432 (dev)
+{% if include_otel -%}
+  otel-collector: # Port 4317 (OTLP)
+{% endif -%}
+```
+
+Start all:
+```bash
+mise run up
+```
+
+Stop all:
+```bash
+mise run down
+```
+
+View logs:
+```bash
+mise run logs
+```
+{% else -%}
+No docker-compose.yml included. Set `include_dockerfile = true` when scaffolding.
+{% endif -%}
+
+## Common Workflows
+
+### Adding a New Feature
+
+1. Create domain directory: `internal/app/users/`
+2. Add models: `models.go`
+3. Add repository interface and implementation: `repository.go`
+4. Add service: `service.go`
+5. Add HTTP handler: `handler.go`
+6. Wire up in `internal/bootstrap/bootstrap.go`
+7. Add routes in `cmd/api/main.go`
+
+### Database Changes
+
+{% if include_db -%}
+1. Update schema in `db/schema/`
+2. Generate migration:
+```bash
+mise run db:diff add_column_foo
+```
+3. Review SQL in `db/migrations/`
+4. Apply:
+```bash
+mise run db:migrate
+```
+{% else -%}
+Database not included. Set `include_db = true` when scaffolding.
+{% endif -%}
+
+### Running Tests
+
+```bash
+mise run test        # Unit tests
+{% if include_e2e -%}
+mise run e2e         # E2E tests
+{% endif -%}
+mise run lint        # Linter
+```
+
+## Mise Quick Reference
+
+| Task | Description |
+|------|-------------|
+| `mise run test` | Run unit tests |
+| `mise run lint` | Run golangci-lint |
+| `mise run tidy` | Tidy dependencies |
+| `mise run build` | Build binary |
+| `mise run fmt` | Format code |
+| `mise run run` | Run service locally |
+{% if include_dockerfile -%}
+| `mise run up` | Start infrastructure |
+| `mise run down` | Stop infrastructure |
+| `mise run logs` | Follow logs |
+{% endif -%}
+{% if include_db -%}
+| `mise run db:up` | Start postgres only |
+| `mise run db:migrate` | Apply migrations |
+| `mise run db:status` | Show migration status |
+| `mise run db:diff <name>` | Generate new migration |
+| `mise run db:reset` | Reset database |
+{% endif -%}
+{% if include_e2e -%}
+| `mise run e2e` | Run e2e tests |
+| `mise run e2e:up` | Start e2e postgres |
+| `mise run e2e:down` | Stop e2e postgres |
+{% endif -%}
+{% if include_mockery -%}
+| `mise run mocks` | Generate mocks |
+{% endif -%}
+{% endif -%}

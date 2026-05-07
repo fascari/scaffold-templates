@@ -1,0 +1,94 @@
+package createexample_test
+
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"{{ module_path }}/internal/app/example/domain"
+	"{{ module_path }}/internal/app/example/handler/createexample"
+	createexampleuc "{{ module_path }}/internal/app/example/usecase/createexample"
+	"{{ module_path }}/internal/app/example/usecase/createexample/mocks"
+
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+)
+
+func TestHandler_Handle_Success(t *testing.T) {
+	mockRepo := mocks.NewRepository(t)
+	mockRepo.EXPECT().
+		Create(mock.Anything, mock.AnythingOfType("domain.Example")).
+		Return(domain.Example{ID: 1, Name: "Test Example"}, nil)
+
+	uc := createexampleuc.New(mockRepo)
+	h := createexample.NewHandler(uc)
+
+	req := newRequest(`{"name":"Test Example"}`)
+	rr := httptest.NewRecorder()
+	h.Handle(rr, req)
+
+	require.Equal(t, http.StatusCreated, rr.Code)
+	require.Equal(t, "application/json", rr.Header().Get("Content-Type"))
+
+	var resp createexample.OutputPayload
+	require.NoError(t, json.Unmarshal(rr.Body.Bytes(), &resp))
+	require.Equal(t, uint(1), resp.ID)
+	require.Equal(t, "Test Example", resp.Name)
+}
+
+func TestHandler_Handle_Error(t *testing.T) {
+	tests := []struct {
+		name           string
+		body           string
+		setupMock      func(*mocks.Repository)
+		expectedStatus int
+	}{
+		{
+			name:           "invalid JSON",
+			body:           `{invalid}`,
+			setupMock:      func(*mocks.Repository) {},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name:           "missing required name",
+			body:           `{}`,
+			setupMock:      func(*mocks.Repository) {},
+			expectedStatus: http.StatusBadRequest,
+		},
+		{
+			name: "usecase returns error",
+			body: `{"name":"Test"}`,
+			setupMock: func(r *mocks.Repository) {
+				r.EXPECT().
+					Create(mock.Anything, mock.AnythingOfType("domain.Example")).
+					Return(domain.Example{}, errors.New("db error"))
+			},
+			expectedStatus: http.StatusInternalServerError,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockRepo := mocks.NewRepository(t)
+			tt.setupMock(mockRepo)
+
+			uc := createexampleuc.New(mockRepo)
+			h := createexample.NewHandler(uc)
+
+			req := newRequest(tt.body)
+			rr := httptest.NewRecorder()
+			h.Handle(rr, req)
+
+			require.Equal(t, tt.expectedStatus, rr.Code)
+		})
+	}
+}
+
+func newRequest(body string) *http.Request {
+	req := httptest.NewRequest(http.MethodPost, "/examples", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	return req
+}

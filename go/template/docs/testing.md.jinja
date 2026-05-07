@@ -1,0 +1,93 @@
+{% if is_service -%}
+# Testing
+
+## Test structure
+
+```
+internal/app/{domain}/
+├── handler/{action}/
+│   └── handler_test.go      — table-driven HTTP handler tests (httptest)
+├── usecase/{action}/
+│   ├── usecase_test.go      — business logic tests with mocks
+│   └── mocks/
+│       └── repository.go    — mockery-generated mock
+└── repository/
+    └── repository_test.go   — integration test (build tag: integration)
+{% if include_e2e %}
+internal/testing/integration/
+└── suite.go                 — testcontainers Suite for Postgres integration tests
+{% endif %}
+```
+
+## Unit tests
+
+All unit tests run without external dependencies.
+Use [testify](https://github.com/stretchr/testify) for assertions and mocks:
+
+```go
+func TestUseCase_Execute_Success(t *testing.T) {
+    mockRepo := mocks.NewRepository(t)
+    mockRepo.EXPECT().Create(mock.Anything, input).Return(expected, nil)
+
+    uc := createexample.New(mockRepo)
+    result, err := uc.Execute(context.Background(), input)
+
+    require.NoError(t, err)
+    require.Equal(t, expected, result)
+}
+```
+
+Run unit tests:
+```bash
+go test ./...
+```
+{% if include_mockery %}
+## Generating mocks
+
+Mocks are pre-generated in `mocks/` subdirectories. To regenerate after changing an interface:
+
+```bash
+go generate ./...
+```
+
+The `//go:generate mockery --all` directive is placed in the usecase file alongside the interface.
+{% endif %}
+{% if include_e2e %}
+## Integration tests
+
+Integration tests use the `integration` build tag and [testcontainers-go](https://golang.testcontainers.org/) for an isolated Postgres instance.
+
+Test files must start with:
+```go
+//go:build integration
+```
+
+Embed `integration.Suite` to get a fresh database per test:
+```go
+type RepositoryTestSuite struct {
+    integration.Suite
+    repo repository.Repository
+}
+
+func (s *RepositoryTestSuite) SetupTest() {
+    s.Suite.SetupTest(s.T())
+    s.repo = repository.New(s.DB)
+}
+```
+
+Run integration tests:
+```bash
+go test -tags integration ./...
+```
+
+> **Note:** Requires Docker. Each test gets its own Postgres container (started and torn down automatically).
+{% endif %}
+
+## Coverage
+
+```bash
+go test -cover ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+{% endif -%}

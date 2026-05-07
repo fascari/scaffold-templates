@@ -1,0 +1,49 @@
+package bootstrap
+
+import (
+	"net/http"
+
+	"{{ module_path }}/cmd/api/modules"
+	"{{ module_path }}/internal/middleware"
+
+	"github.com/go-chi/chi/v5"
+	chimiddleware "github.com/go-chi/chi/v5/middleware"
+{% if include_otel %}
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+{% endif %}
+{% if include_db %}
+	"gorm.io/gorm"
+{% endif %}
+)
+
+// NewRouter creates and configures the HTTP router with all middleware and domain modules.
+{% if include_db %}
+func NewRouter(db *gorm.DB) chi.Router {
+	exampleModule := modules.NewExampleModule(db)
+{% else %}
+func NewRouter() chi.Router {
+	exampleModule := modules.NewExampleModule()
+{% endif %}
+	r := chi.NewRouter()
+
+	r.Use(middleware.RequestID)
+	r.Use(middleware.Logger())
+	r.Use(chimiddleware.Recoverer)
+{% if include_otel %}
+	r.Use(func(next http.Handler) http.Handler {
+		return otelhttp.NewHandler(next, "http-server")
+	})
+{% endif %}
+
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	r.Route("/v1", func(r chi.Router) {
+		exampleModule.Register(r)
+	})
+
+	return r
+}

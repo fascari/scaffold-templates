@@ -1,0 +1,39 @@
+//go:build integration
+
+package repository_test
+
+import (
+	"context"
+	"testing"
+
+	"{{ module_path }}/internal/app/example/domain"
+	"{{ module_path }}/internal/app/example/repository"
+	"{{ module_path }}/internal/testing/integration"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+)
+
+type RepositoryTestSuite struct {
+	integration.Suite
+	repo repository.Repository
+}
+
+func TestRepositorySuite(t *testing.T) {
+	suite.Run(t, new(RepositoryTestSuite))
+}
+
+func (s *RepositoryTestSuite) SetupTest() {
+	s.Suite.SetupTest(s.T())
+	s.repo = repository.New(s.DB)
+}
+
+func (s *RepositoryTestSuite) TestCreate_Success() {
+	example := domain.Example{Name: "Integration Test"}
+
+	result, err := s.repo.Create(context.Background(), example)
+
+	require.NoError(s.T(), err)
+	require.NotZero(s.T(), result.ID)
+	require.Equal(s.T(), example.Name, result.Name)
+}

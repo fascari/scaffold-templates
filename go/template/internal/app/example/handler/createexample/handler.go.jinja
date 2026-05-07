@@ -1,0 +1,56 @@
+package createexample
+
+import (
+	"net/http"
+
+	example "{{ module_path }}/internal/app/example"
+	"{{ module_path }}/internal/app/example/usecase/createexample"
+	"{{ module_path }}/pkg/apperror"
+	pkghttp "{{ module_path }}/pkg/http"
+
+	"github.com/go-chi/chi/v5"
+)
+
+const Path = "/examples"
+
+type Handler struct {
+	useCase createexample.UseCase
+}
+
+func NewHandler(useCase createexample.UseCase) Handler {
+	return Handler{useCase: useCase}
+}
+
+// RegisterRoutes mounts the handler's routes on the given router.
+func RegisterRoutes(r chi.Router, h Handler) {
+	r.Post(Path, h.Handle)
+}
+
+func (h Handler) Handle(w http.ResponseWriter, r *http.Request) {
+	var payload InputPayload
+	if err := pkghttp.ReadJSON(r, &payload); err != nil {
+		http.Error(w, "invalid payload", http.StatusBadRequest)
+		return
+	}
+
+	if err := payload.Validate(); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	created, err := h.useCase.Execute(r.Context(), payload.ToDomain())
+	if err != nil {
+		handleError(w, err)
+		return
+	}
+
+	pkghttp.WriteJSON(w, http.StatusCreated, ToOutputPayload(created))
+}
+
+func handleError(w http.ResponseWriter, err error) {
+	statusCode := http.StatusInternalServerError
+	if apperror.As(err, example.ErrCodeNotFound) {
+		statusCode = http.StatusNotFound
+	}
+	http.Error(w, err.Error(), statusCode)
+}

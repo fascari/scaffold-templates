@@ -1,0 +1,101 @@
+{% if include_db and is_service -%}
+# Database
+
+## Stack
+
+- **PostgreSQL 15**: Relational database
+- **GORM**: ORM for Go
+- **Atlas**: Schema-as-code migration tool
+
+## Why Atlas?
+
+Atlas treats schema as code with versioned migrations. Unlike golang-migrate or goose (SQL-only), Atlas:
+
+- Generates migrations from schema diffs automatically
+- Supports HCL or SQL schema definitions
+- Validates migrations before apply
+- Provides rollback safety via `--dry-run`
+
+[Atlas Docs](https://atlasgo.io/)
+
+## Schema Definition
+
+Define your desired schema in `db/schema/`. Atlas supports two approaches:
+
+1. **SQL files** (`db/schema/schema.sql`): Direct SQL DDL
+2. **HCL files** (`db/schema/*.hcl`): Atlas schema language
+
+Example SQL:
+```sql
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+## Migration Workflow
+
+### 1. Make Schema Changes
+
+Edit files in `db/schema/`.
+
+### 2. Generate Migration
+
+```bash
+mise run db:diff add_users_table
+```
+
+This compares your schema to the current database and generates a timestamped migration in `db/migrations/`.
+
+### 3. Review the Generated SQL
+
+Check `db/migrations/{timestamp}_add_users_table.sql` before applying.
+
+### 4. Apply Migration
+
+```bash
+mise run db:migrate
+```
+
+Atlas applies all pending migrations and tracks them in the `atlas_schema_revisions` table.
+
+## GORM Usage in Repositories
+
+Use GORM with context propagation for transactions:
+
+```go
+func (r *UserRepository) Create(ctx context.Context, user *models.User) error {
+    return database.WithTx(ctx, r.db, func(tx *gorm.DB) error {
+        return tx.Create(user).Error
+    })
+}
+```
+
+The `database.WithTx` helper extracts the transaction from context if available, enabling nested repository calls within a transaction.
+
+## E2E Testing
+
+E2E tests use a separate PostgreSQL instance on port 25432:
+
+```bash
+mise run e2e:up
+mise run e2e
+mise run e2e:down
+```
+
+Migrations for e2e:
+```bash
+./scripts/migrate.sh --e2e
+```
+
+## Common Tasks
+
+| Task | Command |
+|------|---------|
+| Start postgres | `mise run db:up` |
+| Apply migrations | `mise run db:migrate` |
+| Check migration status | `mise run db:status` |
+| Generate new migration | `mise run db:diff <name>` |
+| Reset database | `mise run db:reset` |
+{% endif -%}

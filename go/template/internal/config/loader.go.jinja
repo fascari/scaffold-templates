@@ -1,0 +1,121 @@
+package config
+
+import (
+	"fmt"
+	"strings"
+	"time"
+
+	"github.com/spf13/viper"
+)
+
+func Load() (*Config, error) {
+	viper.SetConfigName("config")
+	viper.SetConfigType("yaml")
+	viper.AddConfigPath(".")
+	viper.AddConfigPath("./config")
+
+	viper.SetEnvPrefix("")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	// App defaults
+	viper.SetDefault("APP_NAME", "{{ project_name }}")
+	viper.SetDefault("APP_ENV", "development")
+
+	// HTTP defaults
+	viper.SetDefault("HTTP_PORT", 8080)
+	viper.SetDefault("HTTP_READ_TIMEOUT", "15s")
+	viper.SetDefault("HTTP_WRITE_TIMEOUT", "15s")
+	viper.SetDefault("HTTP_IDLE_TIMEOUT", "60s")
+
+	// Log defaults
+	viper.SetDefault("LOG_LEVEL", "info")
+	viper.SetDefault("LOG_FORMAT", "json")
+
+{%- if include_db %}
+	// Database defaults
+	viper.SetDefault("DB_MAX_OPEN_CONNS", 25)
+	viper.SetDefault("DB_MAX_IDLE_CONNS", 5)
+	viper.SetDefault("DB_CONN_MAX_LIFETIME", "5m")
+{%- endif %}
+
+{%- if include_grpc %}
+	// GRPC defaults
+	viper.SetDefault("GRPC_PORT", 50051)
+{%- endif %}
+
+{%- if include_otel %}
+	// OTel defaults
+	viper.SetDefault("OTEL_ENABLED", true)
+	viper.SetDefault("OTEL_ENDPOINT", "localhost:4317")
+	viper.SetDefault("OTEL_SERVICE_NAME", "{{ project_name }}")
+{%- endif %}
+
+	_ = viper.ReadInConfig()
+
+{%- if include_db %}
+	// Validate required fields
+	if viper.GetString("DB_URL") == "" {
+		return nil, fmt.Errorf("DB_URL is required when database support is enabled")
+	}
+{%- endif %}
+
+	readTimeout, err := time.ParseDuration(viper.GetString("HTTP_READ_TIMEOUT"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid HTTP_READ_TIMEOUT: %w", err)
+	}
+
+	writeTimeout, err := time.ParseDuration(viper.GetString("HTTP_WRITE_TIMEOUT"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid HTTP_WRITE_TIMEOUT: %w", err)
+	}
+
+	idleTimeout, err := time.ParseDuration(viper.GetString("HTTP_IDLE_TIMEOUT"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid HTTP_IDLE_TIMEOUT: %w", err)
+	}
+
+{%- if include_db %}
+	connMaxLifetime, err := time.ParseDuration(viper.GetString("DB_CONN_MAX_LIFETIME"))
+	if err != nil {
+		return nil, fmt.Errorf("invalid DB_CONN_MAX_LIFETIME: %w", err)
+	}
+{%- endif %}
+
+	return &Config{
+		App: AppConfig{
+			Name: viper.GetString("APP_NAME"),
+			Env:  viper.GetString("APP_ENV"),
+		},
+		HTTP: HTTPConfig{
+			Port:         viper.GetInt("HTTP_PORT"),
+			ReadTimeout:  readTimeout,
+			WriteTimeout: writeTimeout,
+			IdleTimeout:  idleTimeout,
+		},
+		Log: LogConfig{
+			Level:  viper.GetString("LOG_LEVEL"),
+			Format: viper.GetString("LOG_FORMAT"),
+		},
+{%- if include_db %}
+		Database: DatabaseConfig{
+			URL:             viper.GetString("DB_URL"),
+			MaxOpenConns:    viper.GetInt("DB_MAX_OPEN_CONNS"),
+			MaxIdleConns:    viper.GetInt("DB_MAX_IDLE_CONNS"),
+			ConnMaxLifetime: connMaxLifetime,
+		},
+{%- endif %}
+{%- if include_grpc %}
+		GRPC: GRPCConfig{
+			Port: viper.GetInt("GRPC_PORT"),
+		},
+{%- endif %}
+{%- if include_otel %}
+		OTel: OTelConfig{
+			Enabled:     viper.GetBool("OTEL_ENABLED"),
+			Endpoint:    viper.GetString("OTEL_ENDPOINT"),
+			ServiceName: viper.GetString("OTEL_SERVICE_NAME"),
+		},
+{%- endif %}
+	}, nil
+}

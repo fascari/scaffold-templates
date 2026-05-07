@@ -1,0 +1,40 @@
+{% if include_db %}
+package database
+
+import (
+	"fmt"
+
+	"{{ module_path }}/internal/config"
+
+	"github.com/rs/zerolog/log"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+// ConnectPostgres opens a GORM connection to PostgreSQL using the given config.
+func ConnectPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(cfg.URL), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, err
+	}
+
+	sqlDB.SetMaxOpenConns(cfg.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.ConnMaxLifetime)
+
+	if err = sqlDB.Ping(); err != nil {
+		return nil, err
+	}
+
+	log.Info().Msg("successfully connected to database")
+	return db, nil
+}
+{% endif %}

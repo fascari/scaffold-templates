@@ -1,0 +1,61 @@
+package config
+
+import "time"
+
+type Config struct {
+	App  AppConfig
+	HTTP HTTPConfig
+	Log  LogConfig
+{%- if include_db %}
+	Database DatabaseConfig
+{%- endif %}
+{%- if include_grpc %}
+	GRPC GRPCConfig
+{%- endif %}
+{%- if include_otel %}
+	OTel OTelConfig
+{%- endif %}
+}
+
+type AppConfig struct {
+	Name string
+	Env  string
+}
+
+type HTTPConfig struct {
+	Port         int
+	ReadTimeout  time.Duration
+	WriteTimeout time.Duration
+	IdleTimeout  time.Duration
+}
+
+type LogConfig struct {
+	Level  string
+	Format string
+}
+
+{%- if include_db %}
+
+type DatabaseConfig struct {
+	URL             string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime time.Duration
+}
+{%- endif %}
+
+{%- if include_grpc %}
+
+type GRPCConfig struct {
+	Port int
+}
+{%- endif %}
+
+{%- if include_otel %}
+
+type OTelConfig struct {
+	Enabled     bool
+	Endpoint    string
+	ServiceName string
+}
+{%- endif %}

@@ -1,0 +1,11 @@
+package bootstrap
+
+import (
+	"{{ module_path }}/internal/config"
+	"{{ module_path }}/pkg/logger"
+)
+
+// InitLogger initialises the global zerolog logger from the application config.
+func InitLogger(cfg *config.Config) {
+	logger.Init(cfg.Log.Level)
+}

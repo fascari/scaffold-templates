@@ -1,0 +1,13 @@
+go {{ go_version }}
+
+use (
+{%- if include_grpc %}
+	./proto
+{%- endif %}
+	./kit
+{%- for svc in service_names.split(',') %}
+{%- if svc | trim %}
+	./services/{{ svc | trim }}
+{%- endif %}
+{%- endfor %}
+)

@@ -1,0 +1,119 @@
+package bootstrap
+
+import (
+	"context"
+	"fmt"
+	"net/http"
+	"time"
+{% if include_db %}
+	"gorm.io/gorm"
+{% endif %}
+{% if include_grpc %}
+	"google.golang.org/grpc"
+{% endif %}
+	"{{ module_path }}/internal/config"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog/log"
+)
+
+// App holds the application state and dependencies.
+type App struct {
+	config *config.Config
+{% if include_db %}
+	db     *gorm.DB
+{% endif %}
+	router chi.Router
+	server *http.Server
+{% if include_grpc %}
+	grpcServer *grpc.Server
+{% endif %}
+}
+
+// New creates and initialises a new application instance.
+func New(ctx context.Context, cfg *config.Config) (*App, func(), error) {
+	app := &App{config: cfg}
+
+	cleanupFuncs := []func(){}
+{% if include_otel %}
+	if cfg.OTel.Enabled {
+		shutdownOTel, err := setupTelemetry(ctx, cfg)
+		if err != nil {
+			return nil, nil, fmt.Errorf("setup telemetry: %w", err)
+		}
+		cleanupFuncs = append(cleanupFuncs, shutdownOTel)
+	}
+{% endif %}
+{% if include_db %}
+	db, err := NewDB(ctx, cfg)
+	if err != nil {
+		return nil, nil, fmt.Errorf("setup database: %w", err)
+	}
+	app.db = db
+	cleanupFuncs = append(cleanupFuncs, func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+{% endif %}
+{% if include_db %}
+	app.router = NewRouter(db)
+{% else %}
+	app.router = NewRouter()
+{% endif %}
+	app.server = &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.HTTP.Port),
+		Handler: app.router,
+	}
+{% if include_grpc %}
+	grpcServer, grpcCleanup := NewGRPCServer(cfg{% if include_otel %}, cfg.OTel.Enabled{% endif %})
+	app.grpcServer = grpcServer
+	cleanupFuncs = append(cleanupFuncs, grpcCleanup)
+{% endif %}
+	cleanup := func() {
+		for i := len(cleanupFuncs) - 1; i >= 0; i-- {
+			cleanupFuncs[i]()
+		}
+	}
+
+	return app, cleanup, nil
+}
+
+// Run starts the HTTP server and blocks until the context is cancelled.
+func (a *App) Run(ctx context.Context) error {
+	errChan := make(chan error, 1)
+
+	go func() {
+		log.Info().Int("port", a.config.HTTP.Port).Msg("starting HTTP server")
+		if err := a.server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			errChan <- fmt.Errorf("http server error: %w", err)
+		}
+	}()
+{% if include_grpc %}
+	go func() {
+		if err := startGRPCServer(a.grpcServer, a.config.GRPC.Port); err != nil {
+			errChan <- fmt.Errorf("grpc server error: %w", err)
+		}
+	}()
+{% endif %}
+	select {
+	case <-ctx.Done():
+		log.Info().Msg("shutting down gracefully")
+	case err := <-errChan:
+		log.Error().Err(err).Msg("server error")
+		return err
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	if err := a.server.Shutdown(shutdownCtx); err != nil {
+		log.Error().Err(err).Msg("http server shutdown error")
+		return err
+	}
+{% if include_grpc %}
+	a.grpcServer.GracefulStop()
+{% endif %}
+	log.Info().Msg("shutdown complete")
+	return nil
+}

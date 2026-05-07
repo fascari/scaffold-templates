@@ -1,0 +1,127 @@
+{%- if include_e2e %}
+//go:build integration
+
+package integration
+
+import (
+	"context"
+	"database/sql"
+	"os"
+	"path/filepath"
+	"runtime"
+	"testing"
+	"time"
+
+	"github.com/stretchr/testify/require"
+	"github.com/stretchr/testify/suite"
+	"github.com/testcontainers/testcontainers-go"
+	postgrestc "github.com/testcontainers/testcontainers-go/modules/postgres"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+const (
+	postgresImage           = "postgres:16-alpine"
+	postgresDatabase        = "testdb"
+	postgresUsername        = "postgres"
+	postgresPassword        = "postgres"
+	postgresSSLMode         = "sslmode=disable"
+	containerLogMessage     = "database system is ready to accept connections"
+	containerLogOccurrence  = 2
+	containerStartupTimeout = 1 * time.Minute
+	maxOpenConns            = 50
+	maxIdleConns            = 10
+	connMaxLifetime         = 5 * time.Minute
+	migrationsPath          = "db/migrations"
+	rootPathLevels          = "../../.."
+)
+
+// Suite embeds testify/suite and provides a fresh Postgres container per test.
+type Suite struct {
+	suite.Suite
+	DB        *gorm.DB
+	container testcontainers.Container
+	cleanup   func()
+}
+
+// SetupTest spins up a Postgres container and applies migrations before each test.
+func (s *Suite) SetupTest(t *testing.T) {
+	ctx := context.Background()
+
+	pgContainer, err := postgrestc.Run(ctx,
+		postgresImage,
+		postgrestc.WithDatabase(postgresDatabase),
+		postgrestc.WithUsername(postgresUsername),
+		postgrestc.WithPassword(postgresPassword),
+		testcontainers.WithWaitStrategy(
+			wait.ForLog(containerLogMessage).
+				WithOccurrence(containerLogOccurrence).
+				WithStartupTimeout(containerStartupTimeout)),
+	)
+	require.NoError(t, err)
+
+	connStr, err := pgContainer.ConnectionString(ctx, postgresSSLMode)
+	require.NoError(t, err)
+
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+
+	sqlDB, err := db.DB()
+	require.NoError(t, err)
+	sqlDB.SetMaxOpenConns(maxOpenConns)
+	sqlDB.SetMaxIdleConns(maxIdleConns)
+	sqlDB.SetConnMaxLifetime(connMaxLifetime)
+
+	migrationsDir := filepath.Join(rootPath(), migrationsPath)
+	applyMigrations(t, sqlDB, migrationsDir)
+
+	s.DB = db
+	s.container = pgContainer
+	s.cleanup = func() { _ = pgContainer.Terminate(ctx) }
+}
+
+// TearDownTest terminates the container after each test.
+func (s *Suite) TearDownTest() {
+	if s.cleanup != nil {
+		s.cleanup()
+	}
+}
+
+// SkipIfShort skips the test when running with -short flag.
+func (s *Suite) SkipIfShort() {
+	if testing.Short() {
+		s.T().Skip("skipping integration test in short mode")
+	}
+}
+
+func rootPath() string {
+	_, file, _, _ := runtime.Caller(0)
+	return filepath.Join(filepath.Dir(file), rootPathLevels)
+}
+
+// applyMigrations executes all .sql files in the given directory in sorted order.
+func applyMigrations(t *testing.T, sqlDB *sql.DB, migrationsDir string) {
+	entries, err := os.ReadDir(migrationsDir)
+	if err != nil {
+		// migrations directory may not exist in all project configurations
+		return
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
+		}
+
+		path := filepath.Join(migrationsDir, entry.Name())
+		content, err := os.ReadFile(path)
+		require.NoError(t, err, "failed to read migration: %s", entry.Name())
+
+		_, err = sqlDB.Exec(string(content))
+		require.NoError(t, err, "failed to execute migration: %s", entry.Name())
+	}
+}
+{%- endif %}

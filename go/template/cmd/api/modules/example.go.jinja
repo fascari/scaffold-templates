@@ -1,0 +1,31 @@
+package modules
+
+import (
+	"github.com/go-chi/chi/v5"
+{% if include_db %}
+	"gorm.io/gorm"
+{% endif %}
+	"{{ module_path }}/internal/app/example/handler/createexample"
+	examplerepo "{{ module_path }}/internal/app/example/repository"
+	createexampleuc "{{ module_path }}/internal/app/example/usecase/createexample"
+)
+
+// ExampleModule wires the example domain: repository → usecase → handler.
+type ExampleModule struct {
+	handler createexample.Handler
+}
+
+{% if include_db %}
+func NewExampleModule(db *gorm.DB) *ExampleModule {
+	repo := examplerepo.New(db)
+{% else %}
+func NewExampleModule() *ExampleModule {
+	repo := examplerepo.New()
+{% endif %}
+	uc := createexampleuc.New(repo)
+	return &ExampleModule{handler: createexample.NewHandler(uc)}
+}
+
+func (m *ExampleModule) Register(r chi.Router) {
+	createexample.RegisterRoutes(r, m.handler)
+}

@@ -1,0 +1,36 @@
+package main
+
+import (
+	"context"
+	"os"
+	"os/signal"
+	"syscall"
+
+	"{{ module_path }}/internal/bootstrap"
+	"{{ module_path }}/internal/config"
+
+	"github.com/rs/zerolog/log"
+)
+
+func main() {
+	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer cancel()
+
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to load config")
+	}
+
+	bootstrap.InitLogger(cfg)
+
+	app, cleanup, err := bootstrap.New(ctx, cfg)
+	if err != nil {
+		log.Fatal().Err(err).Msg("failed to bootstrap application")
+	}
+	defer cleanup()
+
+	log.Info().Str("service", "{{ project_name }}").Msg("starting")
+	if err := app.Run(ctx); err != nil {
+		log.Fatal().Err(err).Msg("application error")
+	}
+}

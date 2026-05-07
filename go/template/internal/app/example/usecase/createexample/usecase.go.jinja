@@ -1,0 +1,29 @@
+package createexample
+
+import (
+	"context"
+
+	"{{ module_path }}/internal/app/example/domain"
+)
+
+//go:generate mockery --all
+
+type (
+	// Repository is the data-access contract for the create-example use case.
+	Repository interface {
+		Create(ctx context.Context, example domain.Example) (domain.Example, error)
+	}
+
+	// UseCase orchestrates example creation.
+	UseCase struct {
+		repository Repository
+	}
+)
+
+func New(repository Repository) UseCase {
+	return UseCase{repository: repository}
+}
+
+func (u UseCase) Execute(ctx context.Context, example domain.Example) (domain.Example, error) {
+	return u.repository.Create(ctx, example)
+}

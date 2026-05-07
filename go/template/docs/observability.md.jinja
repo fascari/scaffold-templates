@@ -1,0 +1,97 @@
+{% if include_otel and is_service -%}
+# Observability
+
+## Structured Logging
+
+Logging uses Go's standard `log/slog` package with JSON output:
+
+```go
+import "log/slog"
+
+slog.Info("user created", 
+    slog.String("user_id", id),
+    slog.String("email", email))
+```
+
+### Log Levels
+
+Set via config:
+```bash
+APP_LOG_LEVEL=debug  # debug, info, warn, error
+APP_LOG_FORMAT=json  # json or text
+```
+
+### Request ID Propagation
+
+Every HTTP request gets a unique ID injected into context:
+
+```go
+requestID := middleware.GetRequestID(ctx)
+slog.InfoContext(ctx, "processing request",
+    slog.String("request_id", requestID))
+```
+
+The middleware attaches `request_id` to all logs within that request scope.
+
+## Distributed Tracing
+
+OpenTelemetry (OTel) integration for distributed tracing:
+
+### Setup
+
+```go
+import "go.opentelemetry.io/otel"
+
+tracer := otel.Tracer("{{ project_name }}")
+
+func (s *UserService) Create(ctx context.Context, user *User) error {
+    ctx, span := tracer.Start(ctx, "UserService.Create")
+    defer span.End()
+
+    // business logic
+    return s.repo.Create(ctx, user)
+}
+```
+
+### Configuration
+
+```bash
+APP_OTEL_ENDPOINT=localhost:4317
+APP_OTEL_SERVICE_NAME={{ project_name }}
+APP_OTEL_ENABLED=true
+```
+
+### Local Development
+
+The included `otel-collector` receives traces and exports to stdout (debug):
+
+```bash
+mise run up           # starts otel-collector
+mise run logs         # see traces in collector output
+```
+
+### Production Backends
+
+Configure the collector to export to:
+- **Jaeger**: UI at `http://localhost:16686`
+- **Tempo**: Grafana integration
+- **Honeycomb**: Cloud-based observability
+
+Edit `otel-collector-config.yml` to add exporters.
+
+## Metrics (Optional)
+
+To add Prometheus metrics:
+
+1. Use `go.opentelemetry.io/otel/metric`
+2. Expose `/metrics` endpoint
+3. Configure Prometheus scraper
+
+## Health Checks
+
+Standard endpoints:
+- `GET /health` — liveness probe
+- `GET /ready` — readiness probe (checks DB connection)
+
+Used by Kubernetes and Docker Compose healthchecks.
+{% endif -%}

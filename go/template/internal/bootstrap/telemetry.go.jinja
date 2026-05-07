@@ -1,0 +1,23 @@
+{% if include_otel %}package bootstrap
+
+import (
+	"context"
+	"fmt"
+
+	"{{ module_path }}/internal/config"
+	"{{ module_path }}/pkg/telemetry"
+)
+
+// setupTelemetry initialises the OpenTelemetry tracer provider.
+// Returns a shutdown function that must be called during application cleanup.
+func setupTelemetry(ctx context.Context, cfg *config.Config) (func(), error) {
+	tp, err := telemetry.InitTracer(cfg.OTel.ServiceName)
+	if err != nil {
+		return nil, fmt.Errorf("init tracer: %w", err)
+	}
+
+	return func() {
+		_ = tp.Shutdown(context.Background())
+	}, nil
+}
+{% endif %}

@@ -1,0 +1,21 @@
+{% if include_db -%}
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Usage: ./scripts/migrate.sh [--e2e] [extra atlas args...]
+# Wrapper for atlas migrate apply with environment selection.
+# --e2e: Target the e2e database (port 25432)
+
+ATLAS_ENV="local"
+EXTRA_ARGS=()
+
+for arg in "$@"; do
+  if [[ "$arg" == "--e2e" ]]; then
+    ATLAS_ENV="e2e"
+  else
+    EXTRA_ARGS+=("$arg")
+  fi
+done
+
+atlas migrate apply --env "$ATLAS_ENV" "${EXTRA_ARGS[@]}"
+{% endif -%}

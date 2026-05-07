@@ -1,0 +1,21 @@
+{% if include_db %}package bootstrap
+
+import (
+	"context"
+	"fmt"
+
+	"{{ module_path }}/internal/config"
+	"{{ module_path }}/internal/database"
+
+	"gorm.io/gorm"
+)
+
+// NewDB creates a new database connection via the database package.
+func NewDB(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
+	db, err := database.ConnectPostgres(cfg.Database)
+	if err != nil {
+		return nil, fmt.Errorf("setup database: %w", err)
+	}
+	return db, nil
+}
+{% endif %}

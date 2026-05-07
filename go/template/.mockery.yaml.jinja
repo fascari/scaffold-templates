@@ -1,10 +1,6 @@
-quiet: true
+{%- raw -%}
 with-expecter: true
-filename: "mock_{{`{{.InterfaceName}}`}}.go"
-mockname: "Mock{{`{{.InterfaceName}}`}}"
-outpkg: mocks
-packages:
-  {{ module_path }}/internal:
-    config:
-      all: true
-      recursive: true
+case: snake
+disable-version-string: true
+{%- endraw %}
+

@@ -1,0 +1,29 @@
+{% if include_db -%}
+env "local" {
+  src = "file://db/schema"
+  url = "postgres://{{ project_name }}_user:{{ project_name }}_pass@localhost:15432/{{ project_name }}_db?sslmode=disable&search_path=public"
+  dev = "docker://postgres/15/dev?search_path=public"
+  
+  migration {
+    dir = "file://db/migrations"
+  }
+  
+  format {
+    migrate {
+      diff = {% raw %}"{{ sql . \"  \" }}"{% endraw %}
+    }
+  }
+}
+
+{% if include_e2e -%}
+env "e2e" {
+  src = "file://db/schema"
+  url = "postgres://{{ project_name }}_user:{{ project_name }}_pass@localhost:25432/{{ project_name }}_db?sslmode=disable&search_path=public"
+  dev = "docker://postgres/15/dev?search_path=public"
+  
+  migration {
+    dir = "file://db/migrations"
+  }
+}
+{% endif -%}
+{% endif -%}

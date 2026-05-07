@@ -1,0 +1,57 @@
+package repository
+
+import (
+	"context"
+{% if include_db %}
+	"{{ module_path }}/internal/app/example/domain"
+
+	"gorm.io/gorm"
+{% else %}
+	"sync"
+
+	"{{ module_path }}/internal/app/example/domain"
+{% endif %}
+)
+
+{% if include_db %}
+// Repository is the GORM-backed implementation of the example data store.
+type Repository struct {
+	db *gorm.DB
+}
+
+func New(db *gorm.DB) Repository {
+	return Repository{db: db}
+}
+
+func (r Repository) Create(ctx context.Context, example domain.Example) (domain.Example, error) {
+	model := fromDomain(example)
+	if err := r.db.WithContext(ctx).Create(&model).Error; err != nil {
+		return domain.Example{}, err
+	}
+	return model.toDomain(), nil
+}
+{% else %}
+// Repository is an in-memory implementation of the example data store.
+type Repository struct {
+	mu      sync.Mutex
+	nextID  uint
+	storage map[uint]domain.Example
+}
+
+func New() *Repository {
+	return &Repository{
+		nextID:  1,
+		storage: make(map[uint]domain.Example),
+	}
+}
+
+func (r *Repository) Create(ctx context.Context, example domain.Example) (domain.Example, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	example.ID = r.nextID
+	r.nextID++
+	r.storage[example.ID] = example
+	return example, nil
+}
+{% endif %}

@@ -1,0 +1,38 @@
+package repository
+
+import (
+	"time"
+
+	"{{ module_path }}/internal/app/example/domain"
+
+	"gorm.io/gorm"
+)
+
+// Example is the GORM model for the examples table.
+type Example struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement"`
+	Name      string    `gorm:"type:varchar(255);not null"`
+	CreatedAt time.Time `gorm:"autoCreateTime"`
+	UpdatedAt time.Time `gorm:"autoUpdateTime"`
+	gorm.Model
+}
+
+func (Example) TableName() string {
+	return "examples"
+}
+
+func fromDomain(e domain.Example) Example {
+	return Example{
+		ID:   e.ID,
+		Name: e.Name,
+	}
+}
+
+func (e Example) toDomain() domain.Example {
+	return domain.Example{
+		ID:        e.ID,
+		Name:      e.Name,
+		CreatedAt: e.CreatedAt,
+		UpdatedAt: e.UpdatedAt,
+	}
+}

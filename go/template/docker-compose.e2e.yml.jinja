@@ -1,0 +1,18 @@
+{% if include_e2e and include_db -%}
+# E2E test infrastructure (isolated on port 25432)
+services:
+  postgres:
+    image: postgres:15-alpine
+    container_name: {{ project_name }}_postgres_e2e
+    environment:
+      POSTGRES_USER: {{ project_name }}_user
+      POSTGRES_PASSWORD: {{ project_name }}_pass
+      POSTGRES_DB: {{ project_name }}_db
+    ports:
+      - "25432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U {{ project_name }}_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+{% endif -%}
