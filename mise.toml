@@ -1,0 +1,5 @@
+# scaffold-templates — mise config.
+#
+# Tasks live as executable .sh files in .mise/tasks/, auto-discovered by mise.
+# Each file declares its description via `#MISE description="..."`.
+# Run `mise tasks` to list them.
