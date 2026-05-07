@@ -1,0 +1,137 @@
+---
+name: scaffolding-project
+description: Use when bootstrapping a new repository from scratch with the standard personal layout. Triggers on "scaffold", "scaffold a new project", "bootstrap repo", "novo projeto", or "iniciar projeto do zero". Thin wrapper around the Copier templates in this same repo (github.com/fascari/scaffold-templates).
+---
+
+# Scaffolding a New Project
+
+Bootstraps a new repository using the [scaffold-templates](https://github.com/fascari/scaffold-templates) Copier templates, then wires the personal conventions on top: git remote with personal SSH alias, `.github` submodule, `plans/` symlink, and an optional vault folder.
+
+This skill is **versioned in the same repo as the templates**. The skill keeps itself
+in sync with upstream automatically (see step 1).
+
+## When to Use
+
+- Starting a new repository from an empty directory
+- User says "scaffold this project", "bootstrap a new repo", "novo projeto"
+- Before any implementation work — this skill **never** writes business logic
+
+## Constraints
+
+- **Personal account only.** Use `git@github.com-personal:fascari/<repo>.git` as origin.
+- **Stop before implementation.** Once scaffolding is done, hand control back to the user.
+- **Do not enter plan mode automatically.** This is an executive task with a clear procedure.
+- **Trust copier prompts.** Copier asks the structural questions interactively.
+
+## Prerequisites
+
+Verify before starting (fail fast with a clear message if missing):
+
+- `copier` on PATH (`copier --version`). Install hint: `uv tool install copier` or `pipx install copier`.
+- `git`, `mise` on PATH.
+- `~/.ssh/config` has a `github.com-personal` host alias.
+
+## Steps
+
+1. **Self-sync the skill from upstream:**
+   The skill should always run the latest version published in `fascari/scaffold-templates`.
+   Run a quiet sync before doing anything else:
+   ```bash
+   bash <(curl -fsSL https://raw.githubusercontent.com/fascari/scaffold-templates/main/scripts/sync-skill.sh) --quiet
+   ```
+   - The sync script checks if `~/.copilot/skills/scaffolding-project/SKILL.md` matches the upstream version and updates if not.
+   - If offline or the script fails, log a warning and continue with the local version.
+
+2. **Verify the working directory is suitable for scaffolding:**
+   ```bash
+   pwd
+   ls -A | head -20
+   ```
+   - If the directory has files other than `.git/`, `.github/`, `.gitmodules`, ask before proceeding.
+   - If `.git/` already exists with commits, ask whether to scaffold into the existing repo (overlay) or abort.
+
+3. **Identify the language template:**
+   Currently supported: `go`. (Check the [README](https://github.com/fascari/scaffold-templates#languages) for the current list.) Ask the user if it's not obvious from context.
+
+4. **Run copier interactively:**
+   ```bash
+   copier copy --trust gh:fascari/scaffold-templates/<language> .
+   ```
+   - `--trust` is required because the templates run post-render tasks (e.g., `go mod tidy`, dynamic dir creation).
+   - Copier prompts for everything: project name, module path, project type, optional features, license, etc.
+   - Let the user answer the prompts. Do **not** pass `--data` overrides unless the user explicitly preset values.
+
+5. **Initialize git (if not already initialized):**
+   ```bash
+   git init -b main
+   ```
+
+6. **Configure the personal remote:**
+   Ask for the repo name on GitHub if it differs from the directory name. Default = directory name.
+   ```bash
+   git remote add origin git@github.com-personal:fascari/<repo>.git
+   ```
+   If the user has not yet created the repo on GitHub, instruct them to create it manually under the personal account (the work `gh` CLI auth would push to the wrong org).
+
+7. **Add the `.github` submodule (ai-config):**
+   ```bash
+   git submodule add git@github.com-personal:fascari/ai-config.git .github
+   ```
+   This pulls the public skills, agent rules, and `AGENTS.md`.
+
+8. **Create the `plans/` symlink:**
+   ```bash
+   mkdir -p ~/ai-plans/<repo>
+   ln -s ~/ai-plans/<repo> .github/plans
+   ```
+   `.github/plans` is in ai-config's `.gitignore`, so the submodule stays clean.
+
+9. **(Optional) Create the vault project folder** (only if `$COPILOT_VAULT` is set):
+   ```bash
+   mkdir -p "$COPILOT_VAULT/<repo>"/{logs,architecture,plans,features}
+   ```
+
+10. **Verify the scaffold builds (when applicable):**
+    - Go single-service: `mise run build` or `go build ./...`
+    - Library / study / workspace types: skip.
+
+11. **Stage and present, do not commit yet:**
+    ```bash
+    git add -A
+    git status --short
+    ```
+    Show the user what was scaffolded. Ask whether they want the initial commit + push now, or to inspect first.
+
+12. **(On user confirmation) initial commit and push:**
+    ```bash
+    git commit -m "chore: scaffold project from fascari/scaffold-templates"
+    git push -u origin main
+    ```
+
+## What This Skill Does NOT Do
+
+- Write any application logic, tests, or feature code.
+- Pick project_type, license, or feature flags without asking — copier handles that.
+- Create the GitHub remote repo (auth is on the work account; user creates manually).
+- Bump submodules in other repos, run linters, or generate documentation.
+
+## Failure Modes
+
+- **`copier: command not found`** → tell the user to install (`uv tool install copier`) and stop.
+- **SSH push fails with permission denied** → check `ssh -T github.com-personal`; the user may need to load the personal key.
+- **`gh` CLI authenticated as MHE work** → do **not** use `gh repo create`; ask the user to create the repo via web UI under the `fascari` account.
+- **Directory not empty** → list contents and ask before overwriting.
+- **Sync script fails (step 1)** → continue with the local skill version, but warn the user that the skill may be stale.
+
+## First-time install
+
+If this skill isn't installed at all on a new machine, run:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fascari/scaffold-templates/main/scripts/install.sh)
+```
+This clones the repo into `~/personal/profissional/projects/scaffold-templates/` (or a path of your choice) and creates the symlink at `~/.copilot/skills/scaffolding-project/`.
+
+## Reference
+
+- Templates + skill repo: https://github.com/fascari/scaffold-templates
+- Copier docs: https://copier.readthedocs.io/

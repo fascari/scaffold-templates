@@ -17,19 +17,40 @@
 
 ## Usage
 
-The standard workflow is via the [`scaffolding-project`](https://github.com/fascari/ai-config/tree/main/skills/scaffolding-project) skill, which wraps this template, sets up the `.github` submodule, the `plans/` symlink, the initial commit, and the GitHub remote.
+This repo ships **both** the templates and the Copilot skill that drives them. Install once per machine:
 
-You can also invoke `copier` directly:
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/fascari/scaffold-templates/main/scripts/install.sh)
+```
+
+This clones the repo and creates a symlink at `~/.copilot/skills/scaffolding-project/`. Then in any new empty repo dir, ask Copilot CLI: *"scaffold a new go project"* — the [`scaffolding-project`](./skills/scaffolding-project/SKILL.md) skill handles the prompts, copier run, `.github` submodule, `plans/` symlink, and initial commit.
+
+The skill self-syncs on each run via `scripts/sync-skill.sh`, so your installed version stays current automatically.
+
+You can also invoke `copier` directly without the skill:
 
 ```bash
 mkdir my-project && cd my-project
-copier copy "gh:fascari/scaffold-templates/go" .
+copier copy --trust "gh:fascari/scaffold-templates/go" .
 ```
 
 Re-apply the template later (when patterns evolve):
 
 ```bash
 copier update
+```
+
+## Layout
+
+```
+go/                              Copier template for Go projects
+  copier.yml                     prompts, conditions, exclude rules, post-render tasks
+  template/                      Jinja-templated files
+skills/
+  scaffolding-project/SKILL.md   Copilot CLI skill (thin wrapper around copier)
+scripts/
+  install.sh                     first-time install on a new machine
+  sync-skill.sh                  keep the installed skill in sync with upstream
 ```
 
 ## License
