@@ -1,0 +1,57 @@
+package example
+
+import (
+	"net/http"
+
+	"{{ module_path }}/internal/kit/httpjson"
+
+	"github.com/go-chi/chi/v5"
+)
+
+// Handler handles HTTP requests for the example domain.
+type Handler struct {
+	service *Service
+}
+
+// NewHandler creates a new example handler.
+func NewHandler(service *Service) *Handler {
+	return &Handler{
+		service: service,
+	}
+}
+
+// Routes returns a router with all example routes mounted.
+func (h *Handler) Routes() chi.Router {
+	r := chi.NewRouter()
+	r.Get("/", h.List)
+	r.Get("/{id}", h.Get)
+	return r
+}
+
+// List handles GET /examples - returns all examples.
+func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	examples, err := h.service.List(r.Context())
+	if err != nil {
+		httpjson.WriteError(w, err)
+		return
+	}
+
+	httpjson.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": examples,
+	})
+}
+
+// Get handles GET /examples/{id} - returns a single example by ID.
+func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "id")
+
+	example, err := h.service.Get(r.Context(), id)
+	if err != nil {
+		httpjson.WriteError(w, err)
+		return
+	}
+
+	httpjson.WriteJSON(w, http.StatusOK, map[string]interface{}{
+		"data": example,
+	})
+}

@@ -1,0 +1,35 @@
+{% if include_db %}package bootstrap
+
+import (
+	"context"
+	"fmt"
+
+	"{{ module_path }}/internal/config"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+// NewDB creates a new database connection using GORM.
+func NewDB(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
+	db, err := gorm.Open(postgres.Open(cfg.Database.URL), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("open database connection: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get underlying sql.DB: %w", err)
+	}
+
+	sqlDB.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
+
+	if err := sqlDB.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("ping database: %w", err)
+	}
+
+	return db, nil
+}
+{% endif %}

@@ -1,45 +1,113 @@
 [tools]
 go = "{{ go_version }}"
-
-{% if project_type != 'multi-service-workspace' -%}
-[env]
-GOWORK = "off"
+{% if include_db -%}
+atlas = "latest"
 {% endif %}
 
+[env]
+GOWORK = "off"
+_.file = ".env"
+
 [tasks.test]
-description = "Run all tests with race detector"
-run = "go test -race ./..."
+description = "Run unit tests"
+run = "go test -v ./..."
 
 [tasks.lint]
-description = "Lint all packages"
-run = "golangci-lint run ./..."
+description = "Run linter"
+run = "golangci-lint run"
 
 [tasks.tidy]
-description = "Tidy go.mod"
+description = "Tidy dependencies"
 run = "go mod tidy"
 
 [tasks.build]
-description = "Build all packages"
-run = "go build ./..."
+description = "Build the application"
+run = "go build -o bin/app ./cmd/api"
 
-{% if project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] -%}
-[tasks.run]
-description = "Run the service locally"
-run = "go run ./cmd/{{ project_name }}"
-
-{% endif -%}
-{% if include_db -%}
-[tasks."db:migrate"]
-description = "Apply pending database migrations"
-run = "echo 'TODO: wire up migration tool (golang-migrate, atlas, liquibase, etc.)'"
-
-{% endif -%}
-{% if include_mockery -%}
-[tasks.mocks]
-description = "Generate mocks via mockery"
-run = "mockery"
-
-{% endif %}
 [tasks.fmt]
-description = "Format Go code"
-run = "gofmt -s -w ."
+description = "Format code"
+run = "go fmt ./..."
+{% if is_service %}
+
+[tasks.run]
+description = "Run the service"
+{% if include_db -%}
+depends = ["wait:postgres"]
+{% endif -%}
+run = "go run ./cmd/api"
+{% if include_dockerfile %}
+
+[tasks.up]
+description = "Start all infrastructure services"
+run = "docker compose up -d"
+
+[tasks.down]
+description = "Stop all infrastructure services"
+run = "docker compose down"
+
+[tasks.logs]
+description = "Follow infrastructure logs"
+run = "docker compose logs -f"
+{% endif -%}
+{% endif -%}
+{% if include_db %}
+
+[tasks."db:up"]
+description = "Start only postgres container"
+run = "docker compose up -d postgres"
+
+[tasks."wait:postgres"]
+description = "Wait for PostgreSQL to accept connections"
+run = """
+until docker compose exec -T postgres pg_isready -U {{ project_name }}_user 2>/dev/null; do
+  echo "Waiting for PostgreSQL..."
+  sleep 2
+done
+"""
+
+[tasks."db:migrate"]
+description = "Apply all pending migrations"
+depends = ["wait:postgres"]
+run = "atlas migrate apply --env local"
+
+[tasks."db:status"]
+description = "Show migration status"
+run = "atlas migrate status --env local"
+
+[tasks."db:diff"]
+description = "Generate a new migration (usage: mise run db:diff <name>)"
+run = """
+NAME="${1:-new_migration}"
+atlas migrate diff "$NAME" --env local
+"""
+
+[tasks."db:reset"]
+description = "Drop and recreate PostgreSQL data, then re-apply migrations"
+run = """
+docker compose stop postgres
+docker compose rm -f postgres
+docker volume rm {{ project_name }}_postgres_data 2>/dev/null || true
+docker compose up -d postgres
+mise run db:migrate
+"""
+{% endif -%}
+{% if include_e2e %}
+
+[tasks."e2e"]
+description = "Run e2e tests"
+run = "go test -tags=e2e -v ./test/e2e/..."
+
+[tasks."e2e:up"]
+description = "Start postgres for e2e tests (port 25432)"
+run = "docker compose -f docker-compose.e2e.yml up -d"
+
+[tasks."e2e:down"]
+description = "Stop e2e infrastructure"
+run = "docker compose -f docker-compose.e2e.yml down"
+{% endif -%}
+{% if include_mockery %}
+
+[tasks.mocks]
+description = "Generate mocks"
+run = "mockery"
+{% endif -%}

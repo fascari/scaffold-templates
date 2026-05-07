@@ -1,0 +1,13 @@
+package bootstrap
+
+import (
+	"log/slog"
+
+	"{{ module_path }}/internal/config"
+	"{{ module_path }}/internal/kit/logger"
+)
+
+// NewLogger creates a new slog logger based on the configuration.
+func NewLogger(cfg *config.Config) *slog.Logger {
+	return logger.New(cfg.Log.Level, cfg.Log.Format)
+}

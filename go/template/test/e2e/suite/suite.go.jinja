@@ -1,0 +1,174 @@
+{%- if include_e2e %}
+//go:build e2e
+
+package suite
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"net/http"
+	"os"
+	"time"
+
+{%- if include_db %}
+	"github.com/testcontainers/testcontainers-go"
+	"github.com/testcontainers/testcontainers-go/wait"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+{%- endif %}
+
+	"github.com/gavv/httpexpect/v2"
+	_ "github.com/lib/pq"
+	"github.com/stretchr/testify/suite"
+)
+
+const (
+	BaseURL           = "http://localhost:8080"
+	httpClientTimeout = 10 * time.Second
+
+{%- if include_db %}
+	dbImage    = "postgres:15-alpine"
+	dbUser     = "test"
+	dbPassword = "test"
+	dbName     = "testdb"
+	dbPort     = "5432/tcp"
+	dbTimeout  = 30 * time.Second
+{%- endif %}
+)
+
+type Suite struct {
+	suite.Suite
+	E *httpexpect.Expect
+{%- if include_db %}
+	DB        *gorm.DB
+	container testcontainers.Container
+{%- endif %}
+}
+
+func (s *Suite) SetupSuite() {
+	s.requireAPIHealthy()
+{%- if include_db %}
+	s.setupDatabase()
+{%- endif %}
+}
+
+func (s *Suite) SetupTest() {
+	s.E = httpexpect.WithConfig(httpexpect.Config{
+		BaseURL:  BaseURL + "/api/v1",
+		Reporter: httpexpect.NewRequireReporter(s.T()),
+		Client:   &http.Client{Timeout: httpClientTimeout},
+	})
+}
+
+func (s *Suite) TearDownSuite() {
+{%- if include_db %}
+	if s.container != nil {
+		_ = s.container.Terminate(context.Background())
+	}
+{%- endif %}
+}
+
+{%- if include_db %}
+
+func (s *Suite) DB() *gorm.DB {
+	return s.DB
+}
+
+func (s *Suite) BaseURL() string {
+	return BaseURL
+}
+
+func (s *Suite) Reset() {
+	sqlDB, err := s.DB.DB()
+	s.Require().NoError(err)
+
+	tables := []string{}
+	err = s.DB.Raw(`
+		SELECT tablename FROM pg_tables 
+		WHERE schemaname = 'public' 
+		AND tablename != 'schema_migrations'
+	`).Scan(&tables).Error
+	s.Require().NoError(err)
+
+	if len(tables) > 0 {
+		for _, table := range tables {
+			_, err = sqlDB.Exec(fmt.Sprintf("TRUNCATE TABLE %s RESTART IDENTITY CASCADE", table))
+			s.Require().NoError(err)
+		}
+	}
+}
+
+func (s *Suite) setupDatabase() {
+	// If E2E_DB_URL is set, skip container creation and use the provided database
+	if dbURL := os.Getenv("E2E_DB_URL"); dbURL != "" {
+		db, err := gorm.Open(postgres.Open(dbURL), &gorm.Config{
+			Logger: logger.Default.LogMode(logger.Silent),
+		})
+		s.Require().NoError(err)
+		s.DB = db
+		return
+	}
+
+	// Otherwise, spin up a testcontainer
+	ctx := context.Background()
+
+	req := testcontainers.ContainerRequest{
+		Image:        dbImage,
+		ExposedPorts: []string{dbPort},
+		Env: map[string]string{
+			"POSTGRES_USER":     dbUser,
+			"POSTGRES_PASSWORD": dbPassword,
+			"POSTGRES_DB":       dbName,
+		},
+		WaitingFor: wait.ForLog("database system is ready to accept connections").
+			WithOccurrence(2).
+			WithStartupTimeout(dbTimeout),
+	}
+
+	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+		ContainerRequest: req,
+		Started:          true,
+	})
+	s.Require().NoError(err)
+	s.container = container
+
+	host, err := container.Host(ctx)
+	s.Require().NoError(err)
+	port, err := container.MappedPort(ctx, "5432")
+	s.Require().NoError(err)
+
+	dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable TimeZone=UTC",
+		host, port.Port(), dbUser, dbPassword, dbName)
+
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	s.Require().NoError(err)
+	s.DB = db
+
+	// Run migrations if needed - atlas migrate apply or similar
+	// This is a placeholder - integrate with your migration tool
+}
+{%- endif %}
+
+func (s *Suite) requireAPIHealthy() {
+	resp, err := http.Get(BaseURL + "/health")
+	if err != nil {
+		s.T().Fatalf("API not reachable at %s — ensure server is running", BaseURL)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		s.T().Fatalf("API not healthy at %s — status %d", BaseURL, resp.StatusCode)
+	}
+}
+
+{%- if include_db %}
+
+func RowExists(db *sql.DB, query string, args ...any) bool {
+	var count int
+	return db.QueryRow(query, args...).Scan(&count) == nil && count > 0
+}
+{%- endif %}
+{%- endif %}

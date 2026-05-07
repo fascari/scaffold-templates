@@ -1,0 +1,53 @@
+{% if include_grpc %}package bootstrap
+
+import (
+	"fmt"
+	"log/slog"
+	"net"
+
+	"{{ module_path }}/internal/config"
+
+	"google.golang.org/grpc"
+{% if include_otel %}
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+{% endif %}
+)
+
+// NewGRPCServer creates a new gRPC server with optional telemetry.
+func NewGRPCServer(cfg *config.Config{% if include_otel %}, otelEnabled bool{% endif %}) (*grpc.Server, func()) {
+	opts := []grpc.ServerOption{}
+{% if include_otel %}
+
+	if otelEnabled {
+		opts = append(opts,
+			grpc.StatsHandler(otelgrpc.NewServerHandler()),
+		)
+	}
+{% endif %}
+
+	server := grpc.NewServer(opts...)
+
+	// Register your gRPC services here
+	// Example: pb.RegisterYourServiceServer(server, yourServiceImpl)
+
+	cleanup := func() {
+		server.GracefulStop()
+	}
+
+	return server, cleanup
+}
+
+// startGRPCServer starts the gRPC server and blocks until it stops.
+func startGRPCServer(server *grpc.Server, port string, logger *slog.Logger) error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%s", port))
+	if err != nil {
+		return fmt.Errorf("failed to listen on port %s: %w", port, err)
+	}
+
+	logger.Info("starting gRPC server", "port", port)
+	if err := server.Serve(lis); err != nil {
+		return fmt.Errorf("grpc serve error: %w", err)
+	}
+	return nil
+}
+{% endif %}

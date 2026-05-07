@@ -1,0 +1,121 @@
+// Package apperror defines typed application errors with kind classification and HTTP status mapping.
+package apperror
+
+import (
+	"errors"
+	"fmt"
+	"net/http"
+)
+
+// Kind defines error categories for consistent HTTP status mapping.
+type Kind string
+
+const (
+	KindNotFound      Kind = "NOT_FOUND"
+	KindConflict      Kind = "CONFLICT"
+	KindValidation    Kind = "VALIDATION"
+	KindUnauthorized  Kind = "UNAUTHORIZED"
+	KindForbidden     Kind = "FORBIDDEN"
+	KindInternal      Kind = "INTERNAL"
+)
+
+// AppError represents a structured application error.
+type AppError struct {
+	Kind       Kind   `json:"kind"`
+	Message    string `json:"message"`
+	underlying error  `json:"-"`
+}
+
+// New creates an AppError with the given kind and formatted message.
+func New(kind Kind, format string, args ...any) AppError {
+	return AppError{
+		Kind:    kind,
+		Message: fmt.Sprintf(format, args...),
+	}
+}
+
+// Wrap creates an AppError from an existing error, preserving the original.
+func Wrap(kind Kind, err error, format string, args ...any) AppError {
+	return AppError{
+		Kind:       kind,
+		Message:    fmt.Sprintf(format, args...),
+		underlying: err,
+	}
+}
+
+// Error implements the error interface.
+func (e AppError) Error() string {
+	if e.underlying != nil {
+		return fmt.Sprintf("%s: %s (caused by: %v)", e.Kind, e.Message, e.underlying)
+	}
+	return fmt.Sprintf("%s: %s", e.Kind, e.Message)
+}
+
+// Unwrap returns the underlying error, if any.
+func (e AppError) Unwrap() error {
+	return e.underlying
+}
+
+// NotFound creates a NOT_FOUND AppError.
+func NotFound(format string, args ...any) AppError {
+	return New(KindNotFound, format, args...)
+}
+
+// Conflict creates a CONFLICT AppError.
+func Conflict(format string, args ...any) AppError {
+	return New(KindConflict, format, args...)
+}
+
+// Validation creates a VALIDATION AppError.
+func Validation(format string, args ...any) AppError {
+	return New(KindValidation, format, args...)
+}
+
+// Unauthorized creates an UNAUTHORIZED AppError.
+func Unauthorized(format string, args ...any) AppError {
+	return New(KindUnauthorized, format, args...)
+}
+
+// Forbidden creates a FORBIDDEN AppError.
+func Forbidden(format string, args ...any) AppError {
+	return New(KindForbidden, format, args...)
+}
+
+// Internal creates an INTERNAL AppError.
+func Internal(format string, args ...any) AppError {
+	return New(KindInternal, format, args...)
+}
+
+// Is checks if an error is an AppError with a specific kind.
+func Is(err error, kind Kind) bool {
+	var appErr AppError
+	if errors.As(err, &appErr) {
+		return appErr.Kind == kind
+	}
+	return false
+}
+
+// HTTPStatus maps an AppError kind to an HTTP status code.
+func HTTPStatus(kind Kind) int {
+	switch kind {
+	case KindNotFound:
+		return http.StatusNotFound
+	case KindConflict:
+		return http.StatusConflict
+	case KindValidation:
+		return http.StatusBadRequest
+	case KindUnauthorized:
+		return http.StatusUnauthorized
+	case KindForbidden:
+		return http.StatusForbidden
+	case KindInternal:
+		return http.StatusInternalServerError
+	default:
+		return http.StatusInternalServerError
+	}
+}
+
+// StatusCode returns the HTTP status code for this error.
+func (e AppError) StatusCode() int {
+	return HTTPStatus(e.Kind)
+}

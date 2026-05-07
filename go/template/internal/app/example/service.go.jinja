@@ -1,0 +1,40 @@
+package example
+
+import (
+	"context"
+
+	"{{ module_path }}/internal/kit/apperror"
+)
+
+// Service provides business logic for the example domain.
+type Service struct {
+	repo Repository
+}
+
+// NewService creates a new example service.
+func NewService(repo Repository) *Service {
+	return &Service{
+		repo: repo,
+	}
+}
+
+// List returns all examples.
+func (s *Service) List(ctx context.Context) ([]Example, error) {
+	examples, err := s.repo.FindAll(ctx)
+	if err != nil {
+		return nil, apperror.Internal("failed to list examples: %v", err)
+	}
+	return examples, nil
+}
+
+// Get returns a single example by ID.
+func (s *Service) Get(ctx context.Context, id string) (*Example, error) {
+	example, err := s.repo.FindByID(ctx, id)
+	if err != nil {
+		return nil, apperror.Internal("failed to get example: %v", err)
+	}
+	if example == nil {
+		return nil, apperror.NotFound("example not found")
+	}
+	return example, nil
+}

@@ -47,7 +47,8 @@ go/                              Copier template for Go projects
   copier.yml                     prompts, conditions, exclude rules, post-render tasks
   template/                      Jinja-templated files
 skills/
-  scaffolding-project/SKILL.md   Copilot CLI skill (thin wrapper around copier)
+  scaffolding-project/SKILL.md   user-facing: "scaffold a new project" (thin Copier wrapper)
+  maintaining-scaffold/SKILL.md  meta: "evolve the templates themselves" (workflow + decisions)
 scripts/
   install.sh                     first-time install on a new machine
   sync-skill.sh                  keep the installed skill in sync with upstream

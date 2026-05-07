@@ -1,0 +1,56 @@
+// Package clock provides a pluggable time source for testing and production use.
+package clock
+
+import (
+	"sync"
+	"time"
+)
+
+// Clock defines the interface for time operations.
+type Clock interface {
+	Now() time.Time
+}
+
+// realClock implements Clock using system time.
+type realClock struct{}
+
+func (realClock) Now() time.Time {
+	return time.Now()
+}
+
+// Real returns a clock that uses system time.
+func Real() Clock {
+	return realClock{}
+}
+
+// Fake implements Clock for testing with controllable time.
+type Fake struct {
+	mu   sync.Mutex
+	time time.Time
+}
+
+// NewFake creates a Fake clock initialized to the given time.
+func NewFake(t time.Time) *Fake {
+	return &Fake{time: t}
+}
+
+// Now returns the current fake time.
+func (f *Fake) Now() time.Time {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.time
+}
+
+// Set sets the fake clock to an exact time.
+func (f *Fake) Set(t time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.time = t
+}
+
+// Advance moves the fake clock forward by the given duration.
+func (f *Fake) Advance(d time.Duration) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.time = f.time.Add(d)
+}

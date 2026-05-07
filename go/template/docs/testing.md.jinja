@@ -1,0 +1,115 @@
+{% if is_service -%}
+# Testing
+
+## Test Structure
+
+```
+internal/app/{domain}/
+├── handler_test.go      # HTTP handler tests
+├── service_test.go      # Business logic tests
+└── repository_test.go   # Data access tests
+
+test/
+└── e2e/                 # End-to-end tests
+    └── api_test.go
+```
+
+## Unit Tests
+
+Use [testify](https://github.com/stretchr/testify) for assertions and mocking:
+
+```go
+func TestUserService_Create(t *testing.T) {
+    mockRepo := new(mocks.MockUserRepository)
+    service := NewUserService(mockRepo)
+
+    user := &models.User{Email: "test@example.com"}
+    mockRepo.On("Create", mock.Anything, user).Return(nil)
+
+    err := service.Create(context.Background(), user)
+    assert.NoError(t, err)
+    mockRepo.AssertExpectations(t)
+}
+```
+
+Run unit tests:
+```bash
+mise run test
+```
+{% if include_mockery %}
+
+## Generating Mocks
+
+Mocks are generated via [mockery](https://vektra.github.io/mockery/):
+
+```bash
+mise run mocks
+```
+
+Mock files are created in `internal/mocks/`.
+{% endif %}
+
+## E2E Tests
+
+{% if include_e2e -%}
+E2E tests use build tags and testcontainers for isolated infrastructure:
+
+```go
+//go:build e2e
+
+package e2e
+
+import (
+    "testing"
+    "github.com/stretchr/testify/require"
+)
+
+func TestCreateUser(t *testing.T) {
+    // Setup test database container
+    // Start HTTP server
+    // Make HTTP requests
+    // Assert responses
+}
+```
+
+Run e2e tests:
+```bash
+mise run e2e:up
+mise run e2e
+mise run e2e:down
+```
+
+E2E tests run against:
+- PostgreSQL on port 25432 (separate from dev)
+- Fresh migrations on each test run
+{% else -%}
+To enable E2E tests, set `include_e2e = true` when scaffolding.
+{% endif -%}
+
+## Test Fixtures
+
+Store test data in `test/fixtures/`:
+```
+test/fixtures/
+├── users.json
+└── products.json
+```
+
+Load fixtures in tests:
+```go
+func loadFixture(t *testing.T, path string, v interface{}) {
+    data, err := os.ReadFile(path)
+    require.NoError(t, err)
+    require.NoError(t, json.Unmarshal(data, v))
+}
+```
+
+## Coverage
+
+Generate coverage report:
+```bash
+go test -cover ./...
+go test -coverprofile=coverage.out ./...
+go tool cover -html=coverage.out
+```
+{% endif -%}

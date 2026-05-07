@@ -1,4 +1,4 @@
-# Copier configuration for the Go template
+# Copier configuration for the Go template — V2
 # https://copier.readthedocs.io/
 
 _min_copier_version: "9.0.0"
@@ -12,7 +12,7 @@ _answers_file: .copier-answers.yml
 
 project_name:
   type: str
-  help: "Project name (kebab-case, also the directory name and binary name)"
+  help: "Project name (kebab-case, also the directory name)"
   validator: >-
     {% if not (project_name | regex_search('^[a-z][a-z0-9-]*$')) %}
     must be lowercase kebab-case (e.g. my-project)
@@ -51,7 +51,7 @@ project_type:
     Single-service GraphQL: single-service-graphql
     Library (no cmd, flat layout): library
     Study or tutorial (numbered units): study-tutorial
-    Multi-service workspace (go.work): multi-service-workspace
+    Multi-service workspace (go.work + kit): multi-service-workspace
   default: single-service-rest
 
 unit_names:
@@ -70,32 +70,40 @@ service_names:
 # Optional features
 # ──────────────────────────────────────────────────────────────────────────────
 
+include_db:
+  type: bool
+  help: "Include Postgres + GORM + atlas migrations? (recommended for services)"
+  default: true
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
+
+include_grpc:
+  type: bool
+  help: "Include proto/ + gRPC bootstrap?"
+  default: false
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'multi-service-workspace'] }}"
+
+include_otel:
+  type: bool
+  help: "Include OpenTelemetry tracing setup?"
+  default: true
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
+
+include_e2e:
+  type: bool
+  help: "Include test/e2e suite skeleton?"
+  default: true
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
+
 include_dockerfile:
   type: bool
   help: "Include Dockerfile + docker-compose.yml?"
   default: true
   when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
 
-include_db:
-  type: bool
-  help: "Include database migrations dir?"
-  default: false
-  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] }}"
-
-db_engine:
-  type: str
-  help: "Database engine"
-  choices:
-    PostgreSQL: postgres
-    MySQL: mysql
-    SQLite: sqlite
-  default: postgres
-  when: "{{ include_db }}"
-
 include_mockery:
   type: bool
   help: "Include .mockery.yaml for mock generation?"
-  default: false
+  default: true
   when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'library'] }}"
 
 include_env_example:
@@ -120,42 +128,67 @@ current_year:
   when: false
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Internal (not prompted)
+# Computed flags (used by templates and tasks)
 # ──────────────────────────────────────────────────────────────────────────────
 
-# Computed lists from the comma-separated inputs above.
-_unit_list:
-  type: str
-  default: "{{ unit_names.split(',') | map('trim') | reject('equalto', '') | list | join('|') }}"
-  when: false
-
-_service_list:
-  type: str
-  default: "{{ service_names.split(',') | map('trim') | reject('equalto', '') | list | join('|') }}"
+# Convenience boolean: "is this a service-style project that ships a binary?"
+is_service:
+  type: bool
+  default: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] }}"
   when: false
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Per-file conditionals (skip files that don't match the project type / flags)
+# Per-file conditionals
 # ──────────────────────────────────────────────────────────────────────────────
 
 _exclude:
   - "*.pyc"
   - "__pycache__"
   - ".copier-answers.yml"
+  # Dockerfile / compose
   - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}Dockerfile{% endif %}"
   - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}docker-compose.yml{% endif %}"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}docker-compose.dev.yml{% endif %}"
+  - "{% if not include_e2e or not is_service %}docker-compose.e2e.yml{% endif %}"
   - "{% if not include_env_example or project_type in ['library', 'study-tutorial'] %}.env.example{% endif %}"
   - "{% if not include_mockery or project_type in ['study-tutorial', 'multi-service-workspace'] %}.mockery.yaml{% endif %}"
   - "{% if license == 'none' %}LICENSE{% endif %}"
-  - "{% if project_type == 'library' or project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}cmd{% endif %}"
-  - "{% if project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}internal{% endif %}"
-  - "{% if project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}pkg{% endif %}"
+  # cmd dir only for service types
+  - "{% if not is_service %}cmd{% endif %}"
+  # internal/ subdirs that only make sense for service types
+  - "{% if not is_service %}internal/bootstrap{% endif %}"
+  - "{% if not is_service %}internal/app{% endif %}"
+  - "{% if not is_service %}internal/middleware{% endif %}"
+  - "{% if not is_service %}internal/config{% endif %}"
+  # internal/ only for service types and library
+  - "{% if project_type in ['study-tutorial', 'multi-service-workspace'] %}internal{% endif %}"
+  - "{% if project_type in ['study-tutorial', 'multi-service-workspace'] %}pkg{% endif %}"
+  # DB / migrations
+  - "{% if not include_db or not is_service %}db{% endif %}"
+  - "{% if not include_db or not is_service %}internal/database{% endif %}"
+  # gRPC
+  - "{% if not include_grpc %}proto{% endif %}"
+  - "{% if not include_grpc or not is_service %}internal/bootstrap/grpc.go{% endif %}"
+  # OTel
+  - "{% if not include_otel or not is_service %}internal/telemetry{% endif %}"
+  - "{% if not include_otel or not is_service %}internal/bootstrap/telemetry.go{% endif %}"
+  - "{% if not include_otel or not is_service %}otel-collector-config.yml{% endif %}"
+  - "{% if not include_otel %}docs/observability.md{% endif %}"
+  # e2e
+  - "{% if not include_e2e or not is_service %}test{% endif %}"
+  # docs / scripts only for service-shaped projects
+  - "{% if not is_service %}docs{% endif %}"
+  - "{% if not is_service %}scripts{% endif %}"
+  - "{% if not include_db or not is_service %}scripts/migrate.sh{% endif %}"
+  - "{% if not include_db or not is_service %}scripts/init-db.sh{% endif %}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Post-generation tasks
 # ──────────────────────────────────────────────────────────────────────────────
 
 _tasks:
+  - command: "chmod +x scripts/*.sh 2>/dev/null || true"
+    when: "{{ is_service }}"
   - command: "go mod tidy"
     when: "{{ project_type not in ['study-tutorial', 'multi-service-workspace'] }}"
   - command: |
@@ -166,7 +199,7 @@ _tasks:
   - command: |
       mkdir -p services scripts
       for svc in $(echo '{{ service_names }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
-        [ -n "$svc" ] && mkdir -p "services/$svc/cmd/$svc" "services/$svc/internal" && touch "services/$svc/cmd/$svc/.gitkeep" "services/$svc/internal/.gitkeep"
+        [ -n "$svc" ] && mkdir -p "services/$svc/cmd/api" "services/$svc/internal" && touch "services/$svc/cmd/api/.gitkeep" "services/$svc/internal/.gitkeep"
       done
     when: "{{ project_type == 'multi-service-workspace' }}"
   # Note: git init, remote, .github submodule, plans symlink, and initial commit

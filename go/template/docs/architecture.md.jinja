@@ -1,0 +1,88 @@
+{% if is_service -%}
+# {{ project_name }} - Architecture
+
+## Overview
+
+{{ project_description }}
+
+This service follows a **layered architecture** with clear separation of concerns:
+
+```
+┌─────────────────────────────────────────────────┐
+│             HTTP API (Chi Router)               │
+│              cmd/api/main.go                    │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│        Bootstrap & Dependency Injection         │
+│         internal/bootstrap/bootstrap.go          │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│           Application Layer (Handlers)          │
+│         internal/app/{domain}/handler.go         │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│           Business Logic (Services)             │
+│         internal/app/{domain}/service.go         │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│        Data Access Layer (Repositories)         │
+│       internal/app/{domain}/repository.go        │
+└──────────────────┬──────────────────────────────┘
+                   │
+                   ↓
+┌─────────────────────────────────────────────────┐
+│        Infrastructure (Database, Cache)         │
+│              internal/kit/*                     │
+└─────────────────────────────────────────────────┘
+```
+
+## Request Flow
+
+1. **HTTP Request** arrives at Chi router in `cmd/api`
+2. **Handler** extracts params, validates input, calls service
+3. **Service** implements business logic, coordinates repositories
+4. **Repository** interacts with database via GORM
+5. **Response** flows back up through handler to HTTP client
+
+## Layers
+
+### cmd/api
+Entry point. Sets up HTTP server, routes, and starts the application.
+
+### internal/bootstrap
+Wire up dependencies (config, database, repositories, services, handlers).
+
+### internal/app/{domain}
+Domain-specific logic organized by feature:
+- `handler.go` — HTTP handlers
+- `service.go` — Business logic
+- `repository.go` — Data access
+- `models.go` — Domain models
+
+### internal/kit
+Reusable infrastructure components:
+- `logger` — Structured logging (slog)
+- `database` — GORM setup and utilities
+- `httputil` — HTTP helpers (JSON response, error handling)
+{% if include_otel -%}
+- `telemetry` — OpenTelemetry tracing
+{% endif -%}
+
+## Design Principles
+
+- **Dependency injection**: Services and repos injected via constructor
+- **Single responsibility**: Each layer has one job
+- **Testability**: Interfaces enable mocking at layer boundaries
+- **Configuration**: All config via Viper (env > yaml > defaults)
+{% if include_db -%}
+- **Database**: GORM for queries, Atlas for migrations
+{% endif -%}
+{% endif -%}

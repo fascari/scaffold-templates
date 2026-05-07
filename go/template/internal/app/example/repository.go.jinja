@@ -1,0 +1,97 @@
+package example
+
+import (
+	"context"
+{% if include_db %}
+	"gorm.io/gorm"
+{% else %}
+	"sync"
+	"time"
+{% endif %}
+)
+
+// Repository defines the interface for example data access.
+type Repository interface {
+	FindAll(ctx context.Context) ([]Example, error)
+	FindByID(ctx context.Context, id string) (*Example, error)
+}
+{% if include_db %}
+
+// gormRepository is a GORM-based implementation of Repository.
+type gormRepository struct {
+	db *gorm.DB
+}
+
+// NewGORMRepository creates a new GORM repository.
+func NewGORMRepository(db *gorm.DB) Repository {
+	return &gormRepository{db: db}
+}
+
+func (r *gormRepository) FindAll(ctx context.Context) ([]Example, error) {
+	var examples []Example
+	if err := r.db.WithContext(ctx).Find(&examples).Error; err != nil {
+		return nil, err
+	}
+	return examples, nil
+}
+
+func (r *gormRepository) FindByID(ctx context.Context, id string) (*Example, error) {
+	var example Example
+	if err := r.db.WithContext(ctx).Where("id = ?", id).First(&example).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &example, nil
+}
+{% else %}
+
+// inMemoryRepository is an in-memory implementation of Repository.
+type inMemoryRepository struct {
+	mu    sync.RWMutex
+	items map[string]*Example
+}
+
+// NewInMemoryRepository creates a new in-memory repository with sample data.
+func NewInMemoryRepository() Repository {
+	now := time.Now()
+	return &inMemoryRepository{
+		items: map[string]*Example{
+			"1": {
+				ID:        "1",
+				Name:      "Example 1",
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+			"2": {
+				ID:        "2",
+				Name:      "Example 2",
+				CreatedAt: now,
+				UpdatedAt: now,
+			},
+		},
+	}
+}
+
+func (r *inMemoryRepository) FindAll(ctx context.Context) ([]Example, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	examples := make([]Example, 0, len(r.items))
+	for _, item := range r.items {
+		examples = append(examples, *item)
+	}
+	return examples, nil
+}
+
+func (r *inMemoryRepository) FindByID(ctx context.Context, id string) (*Example, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if item, ok := r.items[id]; ok {
+		return item, nil
+	}
+	return nil, nil
+}
+{% endif %}

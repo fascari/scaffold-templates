@@ -1,0 +1,35 @@
+{%- if include_e2e %}
+//go:build e2e
+
+package fixtures
+
+type Example struct {
+	ID   int64
+	Name string
+}
+
+type Option func(*Example)
+
+func NewExample(opts ...Option) Example {
+	e := Example{
+		ID:   1,
+		Name: "Default Example",
+	}
+	for _, opt := range opts {
+		opt(&e)
+	}
+	return e
+}
+
+func WithID(id int64) Option {
+	return func(e *Example) {
+		e.ID = id
+	}
+}
+
+func WithName(name string) Option {
+	return func(e *Example) {
+		e.Name = name
+	}
+}
+{%- endif %}

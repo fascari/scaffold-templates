@@ -1,0 +1,27 @@
+package example
+
+import (
+	"time"
+)
+
+// Example represents an example entity.
+type Example struct {
+{% if include_db %}
+	ID        string    `json:"id" gorm:"primaryKey;type:uuid;default:gen_random_uuid()"`
+	Name      string    `json:"name" gorm:"type:varchar(255);not null"`
+	CreatedAt time.Time `json:"created_at" gorm:"autoCreateTime"`
+	UpdatedAt time.Time `json:"updated_at" gorm:"autoUpdateTime"`
+{% else %}
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+{% endif %}
+}
+{% if include_db %}
+
+// TableName specifies the table name for GORM.
+func (Example) TableName() string {
+	return "examples"
+}
+{% endif %}

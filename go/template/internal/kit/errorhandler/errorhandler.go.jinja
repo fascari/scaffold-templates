@@ -1,0 +1,51 @@
+// Package errorhandler provides chi-compatible HTTP middleware for error recovery and response handling.
+package errorhandler
+
+import (
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"{{ module_path }}/internal/kit/apperror"
+	"{{ module_path }}/internal/kit/httpjson"
+)
+
+// Middleware recovers from panics and handles errors consistently.
+// Pass an optional logger; if nil, errors are not logged.
+func Middleware(logger *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					if logger != nil {
+						logger.ErrorContext(r.Context(), "panic recovered", "error", recovered)
+					}
+					w.WriteHeader(http.StatusInternalServerError)
+					httpjson.WriteError(w, apperror.Internal("internal server error"))
+				}
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// Handler writes an error to the response with appropriate status code.
+// If the error is an AppError, uses its status code; otherwise returns 500.
+func Handler(w http.ResponseWriter, err error, logger *slog.Logger) {
+	status := http.StatusInternalServerError
+
+	var appErr apperror.AppError
+	if errors.As(err, &appErr) {
+		status = appErr.StatusCode()
+	}
+
+	if logger != nil {
+		if status >= http.StatusInternalServerError {
+			logger.Error("request error", "error", err, "status", status)
+		} else {
+			logger.Warn("request error", "error", err, "status", status)
+		}
+	}
+
+	httpjson.WriteError(w, err)
+}

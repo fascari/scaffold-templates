@@ -1,0 +1,68 @@
+// Package validator wraps github.com/go-playground/validator with error mapping to apperror.
+package validator
+
+import (
+	"errors"
+	"reflect"
+	"strings"
+	"sync"
+
+	govalidator "github.com/go-playground/validator/v10"
+
+	"{{ module_path }}/internal/kit/apperror"
+)
+
+var (
+	once sync.Once
+	v    *govalidator.Validate
+)
+
+// init configures the validator once.
+func init() {
+	once.Do(func() {
+		v = govalidator.New()
+		v.RegisterTagNameFunc(func(field reflect.StructField) string {
+			name := strings.SplitN(field.Tag.Get("json"), ",", 2)[0]
+			if name == "-" {
+				return ""
+			}
+			return name
+		})
+	})
+}
+
+// Validator wraps validator configuration.
+type Validator struct{}
+
+// Struct validates a struct and returns an apperror.ValidationError on failure.
+func (Validator) Struct(s any) error {
+	err := v.Struct(s)
+	if err == nil {
+		return nil
+	}
+
+	var validationErrors govalidator.ValidationErrors
+	if !errors.As(err, &validationErrors) {
+		return err
+	}
+
+	fieldErrors := make(map[string]string)
+	for _, e := range validationErrors {
+		fieldErrors[e.Field()] = e.Error()
+	}
+
+	return apperror.Validation("validation failed: %s", formatErrors(fieldErrors))
+}
+
+func formatErrors(errs map[string]string) string {
+	parts := make([]string, 0, len(errs))
+	for field, msg := range errs {
+		parts = append(parts, field+": "+msg)
+	}
+	return strings.Join(parts, "; ")
+}
+
+// New creates a new Validator.
+func New() Validator {
+	return Validator{}
+}

@@ -1,0 +1,55 @@
+// Package httpjson provides JSON encoding/decoding and error handling for HTTP handlers.
+package httpjson
+
+import (
+	"encoding/json"
+	"io"
+	"net/http"
+
+	"{{ module_path }}/internal/kit/apperror"
+)
+
+const (
+	// maxBodySize limits request body size to 1 MB.
+	maxBodySize = 1 << 20
+)
+
+// WriteJSON writes a JSON response with the given status code and body.
+func WriteJSON(w http.ResponseWriter, status int, body any) error {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	return json.NewEncoder(w).Encode(body)
+}
+
+// WriteError writes an error response, mapping AppError kinds to HTTP status codes.
+func WriteError(w http.ResponseWriter, err error) error {
+	status := http.StatusInternalServerError
+	if appErr, ok := err.(apperror.AppError); ok {
+		status = appErr.StatusCode()
+	}
+
+	response := map[string]any{
+		"error": err.Error(),
+	}
+	if appErr, ok := err.(apperror.AppError); ok {
+		response["kind"] = appErr.Kind
+		response["message"] = appErr.Message
+	}
+
+	return WriteJSON(w, status, response)
+}
+
+// DecodeJSON decodes a JSON request body into dst with security constraints.
+// It disallows unknown fields and limits body size to 1 MB.
+func DecodeJSON(r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxBodySize)
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	return decoder.Decode(dst)
+}
+
+// ReadAll reads the entire request body with size limit.
+func ReadAll(r *http.Request) ([]byte, error) {
+	r.Body = http.MaxBytesReader(nil, r.Body, maxBodySize)
+	return io.ReadAll(r.Body)
+}

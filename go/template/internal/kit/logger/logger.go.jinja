@@ -1,0 +1,63 @@
+// Package logger provides slog-based logging with configurable format and level.
+package logger
+
+import (
+	"io"
+	"log/slog"
+	"os"
+	"strings"
+)
+
+// New creates a new configured slog.Logger.
+// level: "debug", "info", "warn", "error"
+// format: "text" or "json"
+func New(level, format string) *slog.Logger {
+	lvl := parseLevel(level)
+
+	var handler slog.Handler
+	opts := &slog.HandlerOptions{Level: lvl}
+
+	if format == "json" {
+		handler = slog.NewJSONHandler(os.Stderr, opts)
+	} else {
+		handler = slog.NewTextHandler(os.Stderr, opts)
+	}
+
+	return slog.New(handler)
+}
+
+// NewWithWriter creates a new slog.Logger writing to the given writer.
+func NewWithWriter(w io.Writer, level, format string) *slog.Logger {
+	lvl := parseLevel(level)
+
+	var handler slog.Handler
+	opts := &slog.HandlerOptions{Level: lvl}
+
+	if format == "json" {
+		handler = slog.NewJSONHandler(w, opts)
+	} else {
+		handler = slog.NewTextHandler(w, opts)
+	}
+
+	return slog.New(handler)
+}
+
+func parseLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "info":
+		return slog.LevelInfo
+	case "warn":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// WithRequestID adds a request ID to the logger.
+func WithRequestID(logger *slog.Logger, requestID string) *slog.Logger {
+	return logger.With("request_id", requestID)
+}

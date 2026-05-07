@@ -1,0 +1,31 @@
+{%- if include_e2e %}
+//go:build e2e
+
+package e2e
+
+import (
+	"net/http"
+	"testing"
+
+	"{{ module_path }}/test/e2e/suite"
+
+	testsuite "github.com/stretchr/testify/suite"
+)
+
+type ExampleTestSuite struct {
+	suite.Suite
+}
+
+func TestExampleSuite(t *testing.T) {
+	s := &ExampleTestSuite{}
+	testsuite.Run(t, s)
+}
+
+func (s *ExampleTestSuite) TestGetExamples() {
+	s.E.GET("/examples").
+		Expect().
+		Status(http.StatusOK).
+		JSON().Object().
+		ContainsKey("data")
+}
+{%- endif %}
