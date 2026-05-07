@@ -74,8 +74,13 @@ Verify before starting (fail fast with a clear message if missing):
    copier copy --trust \
      --data "github_user=$GITHUB_USER" \
      --data "project_name=$(basename "$PWD")" \
-     "gh:$GITHUB_USER/scaffold-templates/<language>" .
+     ~/personal/profissional/projects/scaffold-templates/<language> .
    ```
+
+   Use the local path to the cloned `scaffold-templates` repo. The `gh:` shortcut
+   (`gh:user/repo/<lang>`) does NOT work here because copier expands it to
+   `https://github.com/user/repo/<lang>.git`, which GitHub rejects (no subdirectory
+   support in clone URLs). If the user keeps the repo elsewhere, swap the path.
 
    The two `--data` overrides are allowed and required: both values are derivable from context the user already provided (the exported `$GITHUB_USER` and the current directory name). Forwarding them auto-fills `module_path` (`github.com/$GITHUB_USER/<project>`), `author_name`, and the project name itself, so copier doesn't ask for them.
 

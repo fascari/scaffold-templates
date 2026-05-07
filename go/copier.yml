@@ -18,11 +18,6 @@ project_name:
     must be lowercase kebab-case (e.g. my-project)
     {% endif %}
 
-project_description:
-  type: str
-  help: "One-line description (used in README)"
-  default: ""
-
 github_user:
   type: str
   help: "GitHub username (owner of the repo; used in module path and LICENSE)"
