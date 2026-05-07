@@ -1,0 +1,173 @@
+# Copier configuration for the Go template
+# https://copier.readthedocs.io/
+
+_min_copier_version: "9.0.0"
+_subdirectory: template
+_templates_suffix: .jinja
+_answers_file: .copier-answers.yml
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Identity
+# ──────────────────────────────────────────────────────────────────────────────
+
+project_name:
+  type: str
+  help: "Project name (kebab-case, also the directory name and binary name)"
+  validator: >-
+    {% if not (project_name | regex_search('^[a-z][a-z0-9-]*$')) %}
+    must be lowercase kebab-case (e.g. my-project)
+    {% endif %}
+
+project_description:
+  type: str
+  help: "One-line description (used in README)"
+  default: ""
+
+module_path:
+  type: str
+  help: "Go module path"
+  default: "github.com/fascari/{{ project_name }}"
+
+go_version:
+  type: str
+  help: "Go version"
+  default: "1.26.1"
+
+author_name:
+  type: str
+  help: "Author name (used in LICENSE)"
+  default: "Felipe Ascari"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Project type
+# ──────────────────────────────────────────────────────────────────────────────
+
+project_type:
+  type: str
+  help: "Project type"
+  choices:
+    Single-service REST API: single-service-rest
+    Single-service gRPC: single-service-grpc
+    Single-service GraphQL: single-service-graphql
+    Library (no cmd, flat layout): library
+    Study or tutorial (numbered units): study-tutorial
+    Multi-service workspace (go.work): multi-service-workspace
+  default: single-service-rest
+
+unit_names:
+  type: str
+  help: "Unit dir names, comma-separated (e.g. 01-foundations,02-channels)"
+  default: ""
+  when: "{{ project_type == 'study-tutorial' }}"
+
+service_names:
+  type: str
+  help: "Initial service names, comma-separated (e.g. api,worker,migrator)"
+  default: ""
+  when: "{{ project_type == 'multi-service-workspace' }}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Optional features
+# ──────────────────────────────────────────────────────────────────────────────
+
+include_dockerfile:
+  type: bool
+  help: "Include Dockerfile + docker-compose.yml?"
+  default: true
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
+
+include_db:
+  type: bool
+  help: "Include database migrations dir?"
+  default: false
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] }}"
+
+db_engine:
+  type: str
+  help: "Database engine"
+  choices:
+    PostgreSQL: postgres
+    MySQL: mysql
+    SQLite: sqlite
+  default: postgres
+  when: "{{ include_db }}"
+
+include_mockery:
+  type: bool
+  help: "Include .mockery.yaml for mock generation?"
+  default: false
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'library'] }}"
+
+include_env_example:
+  type: bool
+  help: ".env.example file?"
+  default: true
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'multi-service-workspace'] }}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# License
+# ──────────────────────────────────────────────────────────────────────────────
+
+license:
+  type: str
+  help: "License"
+  choices: [MIT, Apache-2.0, none]
+  default: MIT
+
+current_year:
+  type: str
+  default: "{{ '%Y' | strftime }}"
+  when: false
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Internal (not prompted)
+# ──────────────────────────────────────────────────────────────────────────────
+
+# Computed lists from the comma-separated inputs above.
+_unit_list:
+  type: str
+  default: "{{ unit_names.split(',') | map('trim') | reject('equalto', '') | list | join('|') }}"
+  when: false
+
+_service_list:
+  type: str
+  default: "{{ service_names.split(',') | map('trim') | reject('equalto', '') | list | join('|') }}"
+  when: false
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Per-file conditionals (skip files that don't match the project type / flags)
+# ──────────────────────────────────────────────────────────────────────────────
+
+_exclude:
+  - "*.pyc"
+  - "__pycache__"
+  - ".copier-answers.yml"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}Dockerfile{% endif %}"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}docker-compose.yml{% endif %}"
+  - "{% if not include_env_example or project_type in ['library', 'study-tutorial'] %}.env.example{% endif %}"
+  - "{% if not include_mockery or project_type in ['study-tutorial', 'multi-service-workspace'] %}.mockery.yaml{% endif %}"
+  - "{% if license == 'none' %}LICENSE{% endif %}"
+  - "{% if project_type == 'library' or project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}cmd{% endif %}"
+  - "{% if project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}internal{% endif %}"
+  - "{% if project_type == 'study-tutorial' or project_type == 'multi-service-workspace' %}pkg{% endif %}"
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Post-generation tasks
+# ──────────────────────────────────────────────────────────────────────────────
+
+_tasks:
+  - command: "go mod tidy"
+    when: "{{ project_type not in ['study-tutorial', 'multi-service-workspace'] }}"
+  - command: |
+      for unit in $(echo '{{ unit_names }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
+        [ -n "$unit" ] && mkdir -p "$unit" && touch "$unit/.gitkeep"
+      done
+    when: "{{ project_type == 'study-tutorial' and unit_names }}"
+  - command: |
+      mkdir -p services scripts
+      for svc in $(echo '{{ service_names }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
+        [ -n "$svc" ] && mkdir -p "services/$svc/cmd/$svc" "services/$svc/internal" && touch "services/$svc/cmd/$svc/.gitkeep" "services/$svc/internal/.gitkeep"
+      done
+    when: "{{ project_type == 'multi-service-workspace' }}"
+  # Note: git init, remote, .github submodule, plans symlink, and initial commit
+  # are handled by the scaffolding-project skill — copier focuses on file rendering.

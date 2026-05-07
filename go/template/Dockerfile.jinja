@@ -1,0 +1,19 @@
+# syntax=docker/dockerfile:1
+FROM golang:{{ go_version }}-alpine AS builder
+
+WORKDIR /src
+COPY go.mod go.sum* ./
+RUN go mod download
+
+COPY . .
+{% if project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] -%}
+RUN CGO_ENABLED=0 go build -trimpath -o /out/{{ project_name }} ./cmd/{{ project_name }}
+{%- else -%}
+RUN CGO_ENABLED=0 go build -trimpath ./...
+{%- endif %}
+
+FROM gcr.io/distroless/static-debian12:nonroot
+{% if project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] -%}
+COPY --from=builder /out/{{ project_name }} /{{ project_name }}
+ENTRYPOINT ["/{{ project_name }}"]
+{%- endif %}

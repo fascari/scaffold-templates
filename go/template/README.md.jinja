@@ -1,0 +1,61 @@
+# {{ project_name }}
+
+{% if project_description -%}
+{{ project_description }}
+{%- else -%}
+TODO: one-line description
+{%- endif %}
+
+## Run
+
+```bash
+mise run test          # run tests with race detector
+mise run lint          # run golangci-lint
+{% if project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] -%}
+mise run run           # run the service locally
+{%- endif %}
+mise run build         # build all packages
+```
+
+{% if include_dockerfile -%}
+## Docker
+
+```bash
+docker compose up -d
+```
+{%- endif %}
+
+## Project layout
+
+{% if project_type == 'library' -%}
+Flat library layout. Public API at the root, internal packages under `internal/`.
+{% elif project_type == 'study-tutorial' -%}
+Numbered units, each runnable and testable independently:
+
+```
+{% for unit in unit_names.split(',') -%}
+{{ unit | trim }}/
+{% endfor -%}
+```
+{% elif project_type == 'multi-service-workspace' -%}
+```
+services/
+{% for svc in service_names.split(',') -%}
+  {{ svc | trim }}/
+{% endfor -%}
+```
+{%- else -%}
+```
+cmd/{{ project_name }}/    entry point
+internal/                  application logic
+pkg/                       shared / exported helpers
+```
+{%- endif %}
+
+## License
+
+{% if license == 'none' -%}
+TBD
+{%- else -%}
+{{ license }} — see [LICENSE](LICENSE)
+{%- endif %}

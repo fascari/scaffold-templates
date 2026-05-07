@@ -1,0 +1,45 @@
+[tools]
+go = "{{ go_version }}"
+
+{% if project_type != 'multi-service-workspace' -%}
+[env]
+GOWORK = "off"
+{% endif %}
+
+[tasks.test]
+description = "Run all tests with race detector"
+run = "go test -race ./..."
+
+[tasks.lint]
+description = "Lint all packages"
+run = "golangci-lint run ./..."
+
+[tasks.tidy]
+description = "Tidy go.mod"
+run = "go mod tidy"
+
+[tasks.build]
+description = "Build all packages"
+run = "go build ./..."
+
+{% if project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] -%}
+[tasks.run]
+description = "Run the service locally"
+run = "go run ./cmd/{{ project_name }}"
+
+{% endif -%}
+{% if include_db -%}
+[tasks."db:migrate"]
+description = "Apply pending database migrations"
+run = "echo 'TODO: wire up migration tool (golang-migrate, atlas, liquibase, etc.)'"
+
+{% endif -%}
+{% if include_mockery -%}
+[tasks.mocks]
+description = "Generate mocks via mockery"
+run = "mockery"
+
+{% endif %}
+[tasks.fmt]
+description = "Format Go code"
+run = "gofmt -s -w ."

@@ -1,0 +1,33 @@
+# Binaries
+*.exe
+*.out
+bin/
+.bin/
+
+# Test cache and coverage
+*.test
+coverage.out
+coverage.html
+
+# Go workspace (only for workspace projects)
+{% if project_type != 'multi-service-workspace' -%}
+go.work
+go.work.sum
+{%- endif %}
+
+# Local env
+.env
+.env.local
+*.local
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# copier answers (uncomment to track template version)
+# !.copier-answers.yml
