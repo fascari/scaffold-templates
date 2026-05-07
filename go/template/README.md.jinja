@@ -30,13 +30,27 @@ docker compose up -d
 {% if project_type == 'library' -%}
 Flat library layout. Public API at the root, internal packages under `internal/`.
 {% elif project_type == 'study-tutorial' -%}
-Numbered units, each runnable and testable independently:
+Cenário-named packages, each runnable and testable independently:
 
 ```
-{% for unit in unit_names.split(',') -%}
-{{ unit | trim }}/
+{% if study_entrypoint == 'cli' -%}
+cmd/concurrency/         dispatcher (--pattern <name>)
+{%- else -%}
+cmd/api/                 dispatcher (POST /run/<name>)
+{%- endif %}
+internal/
+{% for name in domain_names.split(',') -%}
+  {{ name | trim }}/             Run(ctx, Params) (Result, error)
 {% endfor -%}
+{% if include_store -%}
+  store/                 map+sync.RWMutex shared store
+{%- endif %}
+docs/
+  foundations.md         text-only mental models
+  decision-guide.md      when to reach for which primitive
 ```
+
+Tests are race-aware (`-race`) and use `goleak` to assert no leaked goroutines.
 {% elif project_type == 'multi-service-workspace' -%}
 ```
 services/

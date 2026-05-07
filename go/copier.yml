@@ -59,14 +59,29 @@ project_type:
     Single-service gRPC: single-service-grpc
     Single-service GraphQL: single-service-graphql
     Library (no cmd, flat layout): library
-    Study or tutorial (numbered units): study-tutorial
+    Study or tutorial (scenario-named packages): study-tutorial
     Multi-service workspace (go.work + kit): multi-service-workspace
   default: single-service-rest
 
-unit_names:
+domain_names:
   type: str
-  help: "Unit dir names, comma-separated (e.g. 01-foundations,02-channels)"
-  default: ""
+  help: "Cenário package names, comma-separated (e.g. goroutines,channels,selects,contexts,transfers,deposits)"
+  default: "goroutines,channels,selects,contexts"
+  when: "{{ project_type == 'study-tutorial' }}"
+
+study_entrypoint:
+  type: str
+  help: "Entrypoint for the study dispatcher"
+  choices:
+    CLI (cmd/concurrency, --pattern flag): cli
+    REST (cmd/api, one POST per scenario): rest
+  default: cli
+  when: "{{ project_type == 'study-tutorial' }}"
+
+include_store:
+  type: bool
+  help: "Generate internal/store (map+sync.RWMutex shared store)? Recommended for scenarios that share state."
+  default: true
   when: "{{ project_type == 'study-tutorial' }}"
 
 service_names:
@@ -209,93 +224,22 @@ _tasks:
     when: "{{ is_service }}"
   - command: "go mod tidy"
     when: "{{ project_type not in ['study-tutorial', 'multi-service-workspace'] }}"
-  - command: |
-      for unit in $(echo '{{ unit_names }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
-        [ -n "$unit" ] && mkdir -p "$unit" && touch "$unit/.gitkeep"
-      done
-    when: "{{ project_type == 'study-tutorial' and unit_names }}"
-  - command: |
-      mkdir -p services bin
+  - command: >-
       MODULE_PATH='{{ module_path }}'
+      ENTRYPOINT='{{ study_entrypoint }}'
+      INCLUDE_STORE='{{ include_store }}'
+      DOMAIN_NAMES='{{ domain_names }}'
+      bash '{{ _copier_conf.src_path }}/_scripts/study-tutorial.sh'
+    when: "{{ project_type == 'study-tutorial' }}"
+  - command: "go mod tidy"
+    when: "{{ project_type == 'study-tutorial' }}"
+  - command: >-
+      MODULE_PATH='{{ module_path }}'
+      PROJECT_NAME='{{ project_name }}'
       GO_VERSION='{{ go_version }}'
-      INCLUDE_DB='{{ include_db }}'
-      INCLUDE_GRPC='{{ include_grpc }}'
-      INCLUDE_OTEL='{{ include_otel }}'
       INCLUDE_DOCKERFILE='{{ include_dockerfile }}'
-      for svc in $(echo '{{ service_names }}' | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'); do
-        [ -z "$svc" ] && continue
-        svcdir="services/$svc"
-        mkdir -p "$svcdir/cmd/api" "$svcdir/internal"
-        # go.mod with replace directive pointing to local kit
-        cat > "$svcdir/go.mod" <<EOF
-      module ${MODULE_PATH}/services/${svc}
-
-      go ${GO_VERSION}
-
-      require ${MODULE_PATH}/kit v0.0.0
-
-      replace ${MODULE_PATH}/kit => ../../kit
-      EOF
-        # cmd/api/main.go — minimal HTTP server using kit packages
-        cat > "$svcdir/cmd/api/main.go" <<EOF
-      package main
-
-      import (
-              "net/http"
-              "os"
-
-              "${MODULE_PATH}/kit/httpjson"
-              "${MODULE_PATH}/kit/logger"
-      )
-
-      func main() {
-              log := logger.New("${svc}")
-              addr := os.Getenv("ADDR")
-              if addr == "" {
-                      addr = ":8080"
-              }
-              mux := http.NewServeMux()
-              mux.HandleFunc("/health", func(w http.ResponseWriter, _ *http.Request) {
-                      _ = httpjson.Write(w, http.StatusOK, map[string]string{"status": "ok"})
-              })
-              log.Info("starting", "addr", addr)
-              if err := http.ListenAndServe(addr, mux); err != nil {
-                      log.Error("server stopped", "err", err)
-                      os.Exit(1)
-              }
-      }
-      EOF
-        # service README
-        cat > "$svcdir/README.md" <<EOF
-      # ${svc}
-
-      Service in the \`{{ project_name }}\` workspace.
-
-      ## Run
-
-      \`\`\`bash
-      cd services/${svc}
-      go run ./cmd/api
-      \`\`\`
-      EOF
-        # service Dockerfile (if requested)
-        if [ "$INCLUDE_DOCKERFILE" = "True" ] || [ "$INCLUDE_DOCKERFILE" = "true" ]; then
-          cat > "$svcdir/Dockerfile" <<EOF
-      FROM golang:${GO_VERSION}-alpine AS builder
-      WORKDIR /workspace
-      COPY ../../kit ./kit
-      COPY . ./services/${svc}
-      WORKDIR /workspace/services/${svc}
-      RUN go build -o /out/app ./cmd/api
-
-      FROM alpine:3.20
-      COPY --from=builder /out/app /app
-      ENTRYPOINT ["/app"]
-      EOF
-        fi
-        # internal/.gitkeep
-        touch "$svcdir/internal/.gitkeep"
-      done
+      SERVICE_NAMES='{{ service_names }}'
+      bash '{{ _copier_conf.src_path }}/_scripts/multi-service-workspace.sh'
     when: "{{ project_type == 'multi-service-workspace' }}"
   # Note: git init, remote, .github submodule, plans symlink, and initial commit
   # are handled by the scaffolding-project skill — copier focuses on file rendering.

@@ -61,6 +61,12 @@ Verify before starting (fail fast with a clear message if missing):
 3. **Identify the language template:**
    Currently supported: `go`. (Check the README for the current list.) Ask the user if it's not obvious from context.
 
+   Note on `study-tutorial`: copier asks `domain_names` (scenario-named
+   packages, e.g. `goroutines,channels,transfers,deposits`), `study_entrypoint`
+   (`cli` → `cmd/concurrency` with `--pattern` flag, `rest` → `cmd/api` with
+   one POST per scenario) and `include_store` (map+sync.RWMutex shared store).
+   You do not pre-answer these — copier owns the prompts.
+
 4. **Run copier interactively — DO NOT mediate the prompts:**
 
    Run this exact command in the user's interactive terminal and let copier own all prompts:
