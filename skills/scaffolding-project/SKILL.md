@@ -67,6 +67,11 @@ Verify before starting (fail fast with a clear message if missing):
    one POST per scenario) and `include_store` (map+sync.RWMutex shared store).
    You do not pre-answer these — copier owns the prompts.
 
+   Note on `cli`: copier asks `cli_style` (`cli-simple` → single-command,
+   os.Args, for assessments/scripts; `cli-complex` → cobra, subcommands,
+   domain/, config/, for releasers/deployment tools). You do not pre-answer
+   this — copier owns the prompts.
+
 4. **Run copier interactively — DO NOT mediate the prompts:**
 
    Run this exact command in the user's interactive terminal and let copier own all prompts:
@@ -86,7 +91,7 @@ Verify before starting (fail fast with a clear message if missing):
 
    **Hard rules for this step (no exceptions, no rationalizations):**
    - **You do not call `ask_user` during this step.** Not for project type, not for units, not for "essential questions", not for anything. Copier asks; the user answers in copier's TUI.
-   - **You do not pre-select, filter, or shortlist `project_type` choices** based on the repo name, your inference about what kind of project it is, or "sensible defaults". The user sees all 6 options copier offers (`single-service-rest`, `single-service-grpc`, `single-service-graphql`, `library`, `study-tutorial`, `multi-service-workspace`) and picks one themselves.
+   - **You do not pre-select, filter, or shortlist `project_type` choices** based on the repo name, your inference about what kind of project it is, or "sensible defaults". The user sees all 7 options copier offers (`single-service-rest`, `single-service-grpc`, `single-service-graphql`, `cli`, `library`, `study-tutorial`, `multi-service-workspace`) and picks one themselves.
    - **You do not pass any `--data` other than the two shown above** unless the user explicitly listed extra values in their request.
    - **You do not paraphrase copier's questions into your own forms.** If you find yourself about to write `ask_user(...)` in this step, stop — that's the bug.
 
