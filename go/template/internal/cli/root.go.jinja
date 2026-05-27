@@ -1,0 +1,13 @@
+package cli
+
+import "github.com/spf13/cobra"
+
+var rootCmd = &cobra.Command{
+	Use:   "{{ project_name }}",
+	Short: "Short description of {{ project_name }}",
+}
+
+// Execute runs the root command. Call this from main.
+func Execute() error {
+	return rootCmd.Execute()
+}

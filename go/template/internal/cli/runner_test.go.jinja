@@ -1,0 +1,27 @@
+package cli_test
+
+import (
+	"os"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
+	"{{ module_path }}/internal/cli"
+)
+
+func TestRun(t *testing.T) {
+	f, err := os.CreateTemp("", "input-*.txt")
+	require.NoError(t, err)
+	defer os.Remove(f.Name())
+
+	_, err = f.WriteString("1 2 3 4 5\n")
+	require.NoError(t, err)
+	require.NoError(t, f.Close())
+
+	require.NoError(t, cli.Run(f.Name()))
+}
+
+func TestRun_MissingFile(t *testing.T) {
+	err := cli.Run("nonexistent.txt")
+	require.Error(t, err)
+}

@@ -43,6 +43,8 @@ for svc in services/*/; do
   (cd "$svc" && go build -o ../../bin/"$name" ./cmd/api)
 done
 """
+{%- elif project_type == 'cli' -%}
+run = "go build -o bin/{{ project_name }} ./cmd"
 {%- else -%}
 run = "go build -o bin/app ./cmd/api"
 {%- endif %}

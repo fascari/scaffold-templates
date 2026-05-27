@@ -1,0 +1,29 @@
+package main
+
+import (
+{% if cli_style == 'cli-complex' %}
+	"os"
+{% else %}
+	"fmt"
+	"os"
+{% endif %}
+	"{{ module_path }}/internal/cli"
+)
+
+func main() {
+{% if cli_style == 'cli-complex' %}
+	if err := cli.Execute(); err != nil {
+		os.Exit(1)
+	}
+{% else %}
+	if len(os.Args) < 2 {
+		fmt.Fprintln(os.Stderr, "usage: {{ project_name }} <input-file>")
+		os.Exit(1)
+	}
+
+	if err := cli.Run(os.Args[1]); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+{% endif %}
+}

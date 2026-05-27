@@ -1,0 +1,26 @@
+package cli
+
+import (
+	"bufio"
+	"fmt"
+	"os"
+)
+
+// Run reads the file at path and processes each line.
+// Replace the body with your domain logic.
+func Run(path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", path, err)
+	}
+	defer f.Close()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// TODO: replace with domain logic
+		fmt.Println(line)
+	}
+
+	return scanner.Err()
+}

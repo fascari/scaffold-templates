@@ -1,0 +1,48 @@
+package config
+
+import (
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/spf13/viper"
+)
+
+// Config holds all settings for {{ project_name }}.
+// Add fields here and extend Load() as the CLI grows.
+type Config struct {
+	LogLevel string // debug, info, warn, error
+}
+
+// Load reads settings from env vars and an optional YAML config file.
+// Lookup order: ~/.config/{{ project_name }}/.{{ project_name }}.yaml, ~/{{ project_name }}.yaml, ./.{{ project_name }}.yaml.
+func Load() (*Config, error) {
+	viper.SetConfigName(".{{ project_name }}")
+	viper.SetConfigType("yaml")
+
+	if home, err := os.UserHomeDir(); err == nil {
+		viper.AddConfigPath(filepath.Join(home, ".config", "{{ project_name }}"))
+		viper.AddConfigPath(home)
+	}
+
+	viper.AddConfigPath(".")
+
+	viper.SetEnvPrefix("{{ project_name | upper | replace('-', '_') }}")
+	viper.AutomaticEnv()
+	viper.SetEnvKeyReplacer(strings.NewReplacer(".", "_"))
+
+	viper.SetDefault("LOG_LEVEL", "info")
+
+	if err := viper.ReadInConfig(); err != nil {
+		var notFound viper.ConfigFileNotFoundError
+		if !errors.As(err, &notFound) {
+			return nil, fmt.Errorf("read config: %w", err)
+		}
+	}
+
+	return &Config{
+		LogLevel: viper.GetString("LOG_LEVEL"),
+	}, nil
+}

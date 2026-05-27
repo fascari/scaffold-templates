@@ -53,10 +53,20 @@ project_type:
     Single-service REST API: single-service-rest
     Single-service gRPC: single-service-grpc
     Single-service GraphQL: single-service-graphql
+    CLI application (single binary): cli
     Library (no cmd, flat layout): library
     Study or tutorial (scenario-named packages): study-tutorial
     Multi-service workspace (go.work + kit): multi-service-workspace
   default: single-service-rest
+
+cli_style:
+  type: str
+  help: "CLI complexity"
+  choices:
+    Simple (single-command, os.Args, no subcommands — scripts, pipes, assessments): cli-simple
+    Complex (multi-command with cobra, domain/, config/ — GitHub releasers, deployment tools): cli-complex
+  default: cli-simple
+  when: "{{ project_type == 'cli' }}"
 
 domain_names:
   type: str
@@ -123,7 +133,7 @@ include_mockery:
   type: bool
   help: "Include .mockery.yaml for mock generation?"
   default: true
-  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'library'] }}"
+  when: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql', 'library'] or is_cli_complex }}"
 
 include_env_example:
   type: bool
@@ -156,6 +166,16 @@ is_service:
   default: "{{ project_type in ['single-service-rest', 'single-service-grpc', 'single-service-graphql'] }}"
   when: false
 
+is_cli:
+  type: bool
+  default: "{{ project_type == 'cli' }}"
+  when: false
+
+is_cli_complex:
+  type: bool
+  default: "{{ project_type == 'cli' and cli_style == 'cli-complex' }}"
+  when: false
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-file conditionals
 # ──────────────────────────────────────────────────────────────────────────────
@@ -170,23 +190,38 @@ _exclude:
   # Root go.mod: skip for workspace (each service has its own)
   - "{% if project_type == 'multi-service-workspace' %}/go.mod{% endif %}"
   # Dockerfile / compose
-  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial', 'multi-service-workspace'] %}Dockerfile{% endif %}"
-  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}docker-compose.yml{% endif %}"
-  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial'] %}docker-compose.dev.yml{% endif %}"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial', 'multi-service-workspace', 'cli'] %}Dockerfile{% endif %}"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial', 'cli'] %}docker-compose.yml{% endif %}"
+  - "{% if not include_dockerfile or project_type in ['library', 'study-tutorial', 'cli'] %}docker-compose.dev.yml{% endif %}"
   - "{% if not include_e2e or not is_service %}docker-compose.e2e.yml{% endif %}"
-  - "{% if not include_env_example or project_type in ['library', 'study-tutorial'] %}.env.example{% endif %}"
-  - "{% if not include_mockery or project_type in ['study-tutorial', 'multi-service-workspace'] %}.mockery.yaml{% endif %}"
+  - "{% if not include_env_example or project_type in ['library', 'study-tutorial', 'cli'] %}.env.example{% endif %}"
+  - "{% if not include_mockery or project_type in ['study-tutorial', 'multi-service-workspace'] or (is_cli and not is_cli_complex) %}.mockery.yaml{% endif %}"
   - "{% if license == 'none' %}LICENSE{% endif %}"
-  # cmd dir only for service types
-  - "{% if not is_service %}cmd{% endif %}"
+  # cmd dir for service types and CLI
+  - "{% if not is_service and project_type != 'cli' %}cmd{% endif %}"
+  - "{% if project_type == 'cli' %}cmd/api{% endif %}"
+  - "{% if project_type != 'cli' %}cmd/main.go{% endif %}"
   # internal/ subdirs that only make sense for service types
   - "{% if not is_service %}internal/bootstrap{% endif %}"
   - "{% if not is_service %}internal/app{% endif %}"
   - "{% if not is_service %}internal/middleware{% endif %}"
-  - "{% if not is_service %}internal/config{% endif %}"
+  - "{% if not is_service and not is_cli_complex %}internal/config{% endif %}"
+  # internal/cli — variants based on complexity
+  - "{% if is_cli_complex %}internal/cli/runner.go{% endif %}"
+  - "{% if is_cli_complex %}internal/cli/runner_test.go{% endif %}"
+  - "{% if is_cli and not is_cli_complex %}internal/cli/root.go{% endif %}"
+  - "{% if is_cli and not is_cli_complex %}internal/cli/example.go{% endif %}"
+  # internal/cli only for CLI; excluded for all other types
+  - "{% if project_type != 'cli' %}internal/cli{% endif %}"
+  # internal/domain only for cli-complex
+  - "{% if not is_cli_complex %}internal/domain{% endif %}"
+  # internal/config files — service vs CLI variants
+  - "{% if is_cli_complex %}internal/config/config.go{% endif %}"
+  - "{% if is_cli_complex %}internal/config/loader.go{% endif %}"
+  - "{% if not is_cli_complex %}internal/config/cli.go{% endif %}"
   # internal/ only for service types and library
   - "{% if project_type in ['study-tutorial', 'multi-service-workspace'] %}internal{% endif %}"
-  - "{% if project_type in ['study-tutorial', 'multi-service-workspace'] %}pkg{% endif %}"
+  - "{% if project_type in ['study-tutorial', 'multi-service-workspace', 'cli'] %}pkg{% endif %}"
   # DB / migrations
   - "{% if not include_db or not is_service %}db{% endif %}"
   - "{% if not include_db or not is_service %}internal/database{% endif %}"
