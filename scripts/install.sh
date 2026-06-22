@@ -2,7 +2,7 @@
 # Install the scaffolding-project skill globally on this machine.
 #
 # What it does:
-#   1. Clones github.com/${GITHUB_USER}/scaffold-templates (with submodules)
+#   1. Clones github.com/${GITHUB_USER}/scaffold-templates
 #      to a chosen path (default: ~/personal/profissional/projects/scaffold-templates).
 #   2. Creates symlinks under ~/.copilot/skills/ pointing to each scaffold skill
 #      (scaffolding-project, maintaining-scaffold), making them globally available.
@@ -28,15 +28,14 @@ echo
 if [ -d "$INSTALL_PATH/.git" ]; then
   echo "==> Repo already cloned at $INSTALL_PATH — pulling latest"
   git -C "$INSTALL_PATH" pull --ff-only
-  git -C "$INSTALL_PATH" submodule update --init --recursive
 else
-  echo "==> Cloning scaffold-templates (with submodules)"
+  echo "==> Cloning scaffold-templates"
   mkdir -p "$(dirname "$INSTALL_PATH")"
-  if git clone --recurse-submodules "$REPO_URL_DEFAULT" "$INSTALL_PATH" 2>/dev/null; then
+  if git clone "$REPO_URL_DEFAULT" "$INSTALL_PATH" 2>/dev/null; then
     :
   else
     echo "    SSH clone failed, falling back to HTTPS"
-    git clone --recurse-submodules "$REPO_URL_HTTPS" "$INSTALL_PATH"
+    git clone "$REPO_URL_HTTPS" "$INSTALL_PATH"
   fi
 fi
 

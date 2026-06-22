@@ -17,17 +17,15 @@
 
 ## Cloning this repo
 
-This repo references [`ai-config`](https://github.com/) as a submodule under `.github/` so the full set of personal Copilot skills is auto-loaded by Copilot CLI when you work here. Clone with:
+This repo uses shared `.github` symlinks into [`ai-config`](https://github.com/) so the full set of personal Copilot skills is auto-loaded by Copilot CLI when you work here. Clone with:
 
 ```bash
-git clone --recurse-submodules git@github.com-<your-github-user>:<your-github-user>/scaffold-templates.git
-# or, if already cloned without submodules:
-git submodule update --init --recursive
+git clone git@github.com-<your-github-user>:<your-github-user>/scaffold-templates.git
 ```
 
 Skills loaded when you open Copilot CLI in this repo:
 
-- `.github/skills/` — pulled from `ai-config` (planning, committing, reviewing, testing, writing-modern-go, etc.)
+- `.github/skills/` — linked from `ai-config` (planning, committing, reviewing, testing, writing-modern-go, etc.)
 - `skills/` — local scaffold skills (`scaffolding-project`, `maintaining-scaffold`); `scripts/install.sh` symlinks both into `~/.copilot/skills/` so they're available in any cwd.
 
 ## Creating a new repo
@@ -53,7 +51,7 @@ copilot                       # start Copilot CLI in the empty directory
 > scaffold a new go project   # ask the skill in chat
 ```
 
-The skill prompts for the language, runs copier, wires the `.github` submodule (ai-config) and `plans/` symlink, configures the `git@github.com-personal:<your-github-user>/<repo>.git` remote, and offers to do the initial commit + push. See [`SKILL.md`](./skills/scaffolding-project/SKILL.md) for the full procedure and prerequisites (SSH alias, `mise`, etc.).
+The skill prompts for the language, runs copier, wires the shared `.github` links and `plans/` symlink, configures the `git@github.com-personal:<your-github-user>/<repo>.git` remote, and offers to do the initial commit + push. See [`SKILL.md`](./skills/scaffolding-project/SKILL.md) for the full procedure and prerequisites (SSH alias, `mise`, etc.).
 
 `scripts/sync-skill.sh` runs at the start of each invocation, so skill updates here flow to your machine without a manual reinstall.
 
@@ -64,7 +62,7 @@ mkdir my-project && cd my-project
 copier copy --trust "gh:<your-github-user>/scaffold-templates/go" .
 ```
 
-Copier prompts for project name, module path, project type, and optional features. `--trust` is required because templates run post-render tasks (`go mod tidy`, dynamic dirs, etc.). After copier finishes you have to wire git/remote/submodule manually — that's what the skill above automates.
+Copier prompts for project name, module path, project type, and optional features. `--trust` is required because templates run post-render tasks (`go mod tidy`, dynamic dirs, etc.). After copier finishes you have to wire git/remote and the shared `.github` links manually — that's what the skill above automates.
 
 ### 3. `mise` task (from a clone of this repo)
 
@@ -88,7 +86,7 @@ copier update
 go/                                Copier template for Go projects
   copier.yml                       prompts, conditions, exclude rules, post-render tasks
   template/                        Jinja-templated files
-.github/                           submodule -> ai-config (auto-loaded by Copilot CLI)
+.github/                           shared symlinks -> ai-config (auto-loaded by Copilot CLI)
 skills/
   scaffolding-project/SKILL.md     personal skill: bootstraps new projects
                                    (symlinked into ~/.copilot/skills/ by install.sh)

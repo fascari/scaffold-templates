@@ -5,7 +5,7 @@ description: Use when bootstrapping a new repository from scratch with the stand
 
 # Scaffolding a New Project
 
-Bootstraps a new repository using the [scaffold-templates](https://github.com/<your-github-user>/scaffold-templates) Copier templates, then wires the personal conventions on top: git remote with personal SSH alias, `.github` submodule, `plans/` symlink, and an optional vault folder.
+Bootstraps a new repository using the [scaffold-templates](https://github.com/<your-github-user>/scaffold-templates) Copier templates, then wires the personal conventions on top: git remote with personal SSH alias, shared `.github` links, `plans/` symlink, and an optional vault folder.
 
 This skill is **versioned in the same repo as the templates**. The skill keeps itself
 in sync with upstream automatically (see step 1).
@@ -109,9 +109,10 @@ Verify before starting (fail fast with a clear message if missing):
    ```
    If the user has not yet created the repo on GitHub, instruct them to create it manually under the personal account (the work `gh` CLI auth would push to the wrong org).
 
-7. **Add the `.github` submodule (ai-config):**
+7. **Link the shared `.github` tree (ai-config):**
    ```bash
-   git submodule add "git@github.com-personal:$GITHUB_USER/ai-config.git" .github
+   git clone "git@github.com-personal:$GITHUB_USER/ai-config.git" ../ai-config
+   ln -s ../ai-config/.github .github
    ```
    This pulls the public skills, agent rules, and `AGENTS.md`.
 
@@ -120,7 +121,7 @@ Verify before starting (fail fast with a clear message if missing):
    mkdir -p ~/ai-plans/<repo>
    ln -s ~/ai-plans/<repo> .github/plans
    ```
-   `.github/plans` is in ai-config's `.gitignore`, so the submodule stays clean.
+   `.github/plans` is in ai-config's `.gitignore`, so the link stays clean.
 
 9. **(Optional) Create the vault project folder** (only if `$COPILOT_VAULT` is set):
    ```bash
@@ -149,7 +150,7 @@ Verify before starting (fail fast with a clear message if missing):
 - Write any application logic, tests, or feature code.
 - Pick project_type, license, or feature flags without asking — copier handles that.
 - Create the GitHub remote repo (auth is on the work account; user creates manually).
-- Bump submodules in other repos, run linters, or generate documentation.
+- Bump linked shared config in other repos, run linters, or generate documentation.
 
 ## Failure Modes
 

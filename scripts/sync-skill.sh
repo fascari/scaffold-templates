@@ -41,7 +41,6 @@ if [ -L "$SKILL_LINK" ]; then
   if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.git" ]; then
     log "==> syncing skill via git pull in $REPO_ROOT"
     if git -C "$REPO_ROOT" pull --ff-only 2>/dev/null; then
-      git -C "$REPO_ROOT" submodule update --init --recursive 2>/dev/null || true
       log "    up to date."
       exit 0
     else

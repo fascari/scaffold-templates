@@ -271,5 +271,5 @@ _tasks:
       SERVICE_NAMES='{{ service_names }}'
       bash '{{ _copier_conf.src_path }}/_scripts/multi-service-workspace.sh'
     when: "{{ project_type == 'multi-service-workspace' }}"
-  # Note: git init, remote, .github submodule, plans symlink, and initial commit
+  # Note: git init, remote, .github tree, plans symlink, and initial commit
   # are handled by the scaffolding-project skill — copier focuses on file rendering.

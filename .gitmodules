@@ -1,4 +1,0 @@
-[submodule ".github"]
-	path = .github
-	url = git@github.com-personal:fascari/ai-config.git
-	branch = main
