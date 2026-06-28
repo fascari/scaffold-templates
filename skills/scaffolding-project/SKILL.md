@@ -1,175 +1,142 @@
 ---
 name: scaffolding-project
-description: Use when bootstrapping a new repository from scratch with the standard personal layout. Triggers on "scaffold", "scaffold a new project", "bootstrap repo", "novo projeto", or "iniciar projeto do zero". Thin wrapper around the Copier templates in this same repo (github.com/<your-github-user>/scaffold-templates).
+description: Use when bootstrapping a new repository from scratch with the standard Copier templates. Triggers on "scaffold a project", "novo projeto", "bootstrap repo", or similar.
 ---
 
-# Scaffolding a New Project
+# Scaffolding A New Project
 
-Bootstraps a new repository using the [scaffold-templates](https://github.com/<your-github-user>/scaffold-templates) Copier templates, then wires the personal conventions on top: git remote with personal SSH alias, shared `.github` links, `plans/` symlink, and an optional vault folder.
+Bootstraps a repository using the `scaffold-templates` Copier templates. The generated project receives only project files. AI-agent skills, instructions, memory, and provider-specific configuration stay global in the developer environment.
 
-This skill is **versioned in the same repo as the templates**. The skill keeps itself
-in sync with upstream automatically (see step 1).
+## Core Rules
 
-## When to Use
+- Do not copy or link AI skills into the generated repository.
+- Do not create `.github/` for AI-agent configuration. GitHub-native files belong there only when the project explicitly needs them, such as workflows.
+- Do not clone or link `ai-config`, `atlas`, or any other sibling repository.
+- Do not write absolute local paths into generated files, docs, git remotes, or Copier answers.
+- Treat the GitHub owner, remote URL, and AI memory location as configurable inputs.
 
-- Starting a new repository from an empty directory
-- User says "scaffold this project", "bootstrap a new repo", "novo projeto"
-- Before any implementation work — this skill **never** writes business logic
+## Required Tools
 
-## Constraints
+Verify before starting and fail fast if missing:
 
-- **Personal account only.** Use `git@github.com-personal:<your-github-user>/<repo>.git` as origin.
-- **Stop before implementation.** Once scaffolding is done, hand control back to the user.
-- **Do not enter plan mode automatically.** This is an executive task with a clear procedure.
-- **Trust copier prompts.** Copier asks the structural questions interactively.
+```bash
+git --version
+copier --version
+go version
+```
 
-## Prerequisites
+For remote templates, Copier also needs network access to the template repository. For local template usage, use the local path to this repository instead.
 
-Verify before starting (fail fast with a clear message if missing):
+## Inputs To Confirm
 
-- `copier` on PATH (`copier --version`). Install hint: `uv tool install copier` or `pipx install copier`.
-- `git`, `mise` on PATH.
-- `~/.ssh/config` has a `github.com-personal` host alias.
+Ask only for values that cannot be inferred safely:
 
-## Steps
+- Target language template. Currently supported: `go`.
+- Project name. Use the current directory basename when it is already the intended repo name.
+- GitHub owner for module path and default origin URL. Prefer `$GITHUB_OWNER`; fall back to `$GITHUB_USER` only as a compatibility alias.
+- Whether to configure a git remote. If yes, use `$GIT_REMOTE_URL` when set; otherwise default to `git@github.com:<owner>/<repo>.git`.
+- Copier feature choices such as project type, database, gRPC, GraphQL, CLI style, and license. Let Copier prompt for these unless the user already supplied them.
 
-0. **Resolve the GitHub user** (used in every URL/remote below):
+## Procedure
+
+1. **Check the target directory.**
+
+   Run from the target project root, not from the `scaffold-templates` repository. The directory should be empty, except `.git/` is acceptable if the user already ran `git init`.
+
+   Existing AI-agent instruction files such as `AGENTS.md` may remain when they were created by the user's environment, but do not create or modify them as part of scaffolding. If other project files exist, stop and ask before proceeding.
+
+2. **Resolve template source.**
+
+   Prefer a local template path when this skill is installed from a clone:
+
    ```bash
-   GITHUB_USER="${GITHUB_USER:-}"
+   <scaffold-templates>/go
    ```
-   - If `$GITHUB_USER` is set in the environment, use it silently.
-   - Otherwise, **ask the user once** ("What's your GitHub username?") and export it for the rest of the session: `export GITHUB_USER=<answer>`.
-   - Use `$GITHUB_USER` in all subsequent commands. Wherever this skill shows `<your-github-user>`, substitute `$GITHUB_USER` literally — do **not** hardcode any username in commands you run.
 
-1. **Self-sync the skill from upstream:**
-   The skill should always run the latest version published in `$GITHUB_USER/scaffold-templates`.
-   Run a quiet sync before doing anything else:
+   Otherwise use the remote Copier source:
+
    ```bash
-   GITHUB_USER="$GITHUB_USER" bash <(curl -fsSL "https://raw.githubusercontent.com/$GITHUB_USER/scaffold-templates/main/scripts/sync-skill.sh") --quiet
+   gh:<owner>/scaffold-templates/go
    ```
-   - The sync script checks if `~/.copilot/skills/scaffolding-project/SKILL.md` matches the upstream version and updates if not.
-   - If offline or the script fails, log a warning and continue with the local version.
 
-2. **Verify the working directory is suitable for scaffolding:**
+3. **Run Copier.**
+
+   Pass only portable data:
+
    ```bash
-   pwd
-   ls -A | head -20
-   ```
-   - If the directory has files other than `.git/`, `.github/`, `.gitmodules`, ask before proceeding.
-   - If `.git/` already exists with commits, ask whether to scaffold into the existing repo (overlay) or abort.
-
-3. **Identify the language template:**
-   Currently supported: `go`. (Check the README for the current list.) Ask the user if it's not obvious from context.
-
-   Note on `study-tutorial`: copier asks `domain_names` (scenario-named
-   packages, e.g. `goroutines,channels,transfers,deposits`), `study_entrypoint`
-   (`cli` → `cmd/concurrency` with `--pattern` flag, `rest` → `cmd/api` with
-   one POST per scenario) and `include_store` (map+sync.RWMutex shared store).
-   You do not pre-answer these — copier owns the prompts.
-
-   Note on `cli`: copier asks `cli_style` (`cli-simple` → single-command,
-   os.Args, for assessments/scripts; `cli-complex` → cobra, subcommands,
-   domain/, config/, for releasers/deployment tools). You do not pre-answer
-   this — copier owns the prompts.
-
-4. **Run copier interactively — DO NOT mediate the prompts:**
-
-   Run this exact command in the user's interactive terminal and let copier own all prompts:
-   ```bash
+   cd <target-project>
    copier copy --trust \
-     --data "github_user=$GITHUB_USER" \
-     --data "project_name=$(basename "$PWD")" \
-     ~/personal/profissional/projects/scaffold-templates/<language> .
+     --data "project_name=<repo>" \
+     --data "github_user=<owner>" \
+     <template-source> .
    ```
 
-   Use the local path to the cloned `scaffold-templates` repo. The `gh:` shortcut
-   (`gh:user/repo/<lang>`) does NOT work here because copier expands it to
-   `https://github.com/user/repo/<lang>.git`, which GitHub rejects (no subdirectory
-   support in clone URLs). If the user keeps the repo elsewhere, swap the path.
+   Continue through Copier prompts with the user. Do not invent product choices.
 
-   The two `--data` overrides are allowed and required: both values are derivable from context the user already provided (the exported `$GITHUB_USER` and the current directory name). Forwarding them auto-fills `module_path` (`github.com/$GITHUB_USER/<project>`), `author_name`, and the project name itself, so copier doesn't ask for them.
+4. **Initialize git if needed.**
 
-   **Hard rules for this step (no exceptions, no rationalizations):**
-   - **You do not call `ask_user` during this step.** Not for project type, not for units, not for "essential questions", not for anything. Copier asks; the user answers in copier's TUI.
-   - **You do not pre-select, filter, or shortlist `project_type` choices** based on the repo name, your inference about what kind of project it is, or "sensible defaults". The user sees all 7 options copier offers (`single-service-rest`, `single-service-grpc`, `single-service-graphql`, `cli`, `library`, `study-tutorial`, `multi-service-workspace`) and picks one themselves.
-   - **You do not pass any `--data` other than the two shown above** unless the user explicitly listed extra values in their request.
-   - **You do not paraphrase copier's questions into your own forms.** If you find yourself about to write `ask_user(...)` in this step, stop — that's the bug.
-
-   Your only job in step 4 is: invoke copier and stay silent until it finishes. `--trust` is required because templates run post-render tasks (`go mod tidy`, dynamic dirs).
-
-5. **Initialize git (if not already initialized):**
    ```bash
-   git init -b main
+   git init
    ```
 
-6. **Configure the personal remote:**
-   Ask for the repo name on GitHub if it differs from the directory name. Default = directory name.
+5. **Configure the default origin only when requested.**
+
    ```bash
-   git remote add origin "git@github.com-personal:$GITHUB_USER/<repo>.git"
+   git remote add origin "${GIT_REMOTE_URL:-git@github.com:<owner>/<repo>.git}"
    ```
-   If the user has not yet created the repo on GitHub, instruct them to create it manually under the personal account (the work `gh` CLI auth would push to the wrong org).
 
-7. **Link the shared `.github` tree (ai-config):**
+   If `origin` already exists, inspect it and ask before changing it.
+
+6. **Create external AI memory only when configured.**
+
+   If `$AI_MEMORY_HOME` is set, create the project folders outside the repository:
+
    ```bash
-   git clone "git@github.com-personal:$GITHUB_USER/ai-config.git" ../ai-config
-   ln -s ../ai-config/.github .github
+   mkdir -p "$AI_MEMORY_HOME/<repo>"/{logs,architecture,plans,features}
    ```
-   This pulls the public skills, agent rules, and `AGENTS.md`.
 
-8. **Create the `plans/` symlink:**
+   Do not create a repository symlink to that folder.
+
+7. **Run validation.**
+
+   For Go templates, run:
+
    ```bash
-   mkdir -p ~/ai-plans/<repo>
-   ln -s ~/ai-plans/<repo> .github/plans
+   go mod tidy
+   go test ./...
+   go build ./...
    ```
-   `.github/plans` is in ai-config's `.gitignore`, so the link stays clean.
 
-9. **(Optional) Create the vault project folder** (only if `$COPILOT_VAULT` is set):
+8. **Show the final state.**
+
    ```bash
-   mkdir -p "$COPILOT_VAULT/<repo>"/{logs,architecture,plans,features}
+   git status --short
    ```
 
-10. **Verify the scaffold builds (when applicable):**
-    - Go single-service: `mise run build` or `go build ./...`
-    - Library / study / workspace types: skip.
+   Summarize the template type, enabled major features, validation result, and any manual next steps.
 
-11. **Stage and present, do not commit yet:**
-    ```bash
-    git add -A
-    git status --short
-    ```
-    Show the user what was scaffolded. Ask whether they want the initial commit + push now, or to inspect first.
+## Boundaries
 
-12. **(On user confirmation) initial commit and push:**
-    ```bash
-    git commit -m "chore: scaffold project from \$GITHUB_USER/scaffold-templates"
-    git push -u origin main
-    ```
+Do not:
 
-## What This Skill Does NOT Do
-
-- Write any application logic, tests, or feature code.
-- Pick project_type, license, or feature flags without asking — copier handles that.
-- Create the GitHub remote repo (auth is on the work account; user creates manually).
-- Bump linked shared config in other repos, run linters, or generate documentation.
+- Create the GitHub repository remotely unless the user explicitly asks.
+- Commit, push, or open a pull request without explicit approval.
+- Add provider-specific AI configuration to the generated project.
+- Add project-local skill links.
+- Assume a personal SSH host alias.
 
 ## Failure Modes
 
-- **`copier: command not found`** → tell the user to install (`uv tool install copier`) and stop.
-- **SSH push fails with permission denied** → check `ssh -T github.com-personal`; the user may need to load the personal key.
-- **`gh` CLI authenticated as MHE work** → do **not** use `gh repo create`; ask the user to create the repo via web UI under the personal account.
-- **Directory not empty** → list contents and ask before overwriting.
-- **Sync script fails (step 1)** → continue with the local skill version, but warn the user that the skill may be stale.
+- **Copier cannot find the template**: rerun with a local template path or set `GITHUB_OWNER` for the remote source.
+- **Git remote auth fails**: use a standard GitHub remote, or ask the user for `GIT_REMOTE_URL`.
+- **Validation fails**: keep the generated files in place, report the failing command, and fix template issues only when the user asks to update the scaffold.
 
-## First-time install
+## Installing This Skill Globally
 
-If this skill isn't installed at all on a new machine, run (replace `<your-github-user>` with your actual GitHub username — this section is bootstrap, run before the skill itself):
+From a clone of `scaffold-templates`:
+
 ```bash
-export GITHUB_USER=<your-github-user>
-bash <(curl -fsSL "https://raw.githubusercontent.com/$GITHUB_USER/scaffold-templates/main/scripts/install.sh")
+./scripts/install.sh --provider codex
 ```
-This clones the repo into `~/personal/profissional/projects/scaffold-templates/` (or a path of your choice) and creates symlinks for `scaffolding-project` and `maintaining-scaffold` under `~/.copilot/skills/`.
 
-## Reference
-
-- Templates + skill repo: https://github.com/<your-github-user>/scaffold-templates
-- Copier docs: https://copier.readthedocs.io/
+Other providers can be selected with `--provider copilot`, `--provider all`, or `--provider custom` plus `AI_SKILLS_DIR`.

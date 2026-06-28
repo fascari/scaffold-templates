@@ -24,8 +24,9 @@ fi
 
 mkdir "$NAME"
 cd "$NAME"
-GITHUB_USER="${GITHUB_USER:?set GITHUB_USER to your GitHub username}"
-copier copy --trust "gh:${GITHUB_USER}/scaffold-templates/${LANG}" .
+GITHUB_OWNER="${GITHUB_OWNER:-${GITHUB_USER:-}}"
+GITHUB_OWNER="${GITHUB_OWNER:?set GITHUB_OWNER to the GitHub owner for scaffold-templates}"
+copier copy --trust "gh:${GITHUB_OWNER}/scaffold-templates/${LANG}" .
 
 echo
 echo "✓ Scaffold complete in $(pwd)"

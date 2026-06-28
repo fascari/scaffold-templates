@@ -24,7 +24,7 @@ github_user:
   default: ""
   validator: >-
     {% if not github_user %}
-    required (e.g. octocat). The scaffolding-project skill passes this via --data when $GITHUB_USER is exported.
+    required (e.g. octocat). The scaffolding-project skill passes this via --data when $GITHUB_OWNER or $GITHUB_USER is exported.
     {% endif %}
 
 module_path:
@@ -271,5 +271,5 @@ _tasks:
       SERVICE_NAMES='{{ service_names }}'
       bash '{{ _copier_conf.src_path }}/_scripts/multi-service-workspace.sh'
     when: "{{ project_type == 'multi-service-workspace' }}"
-  # Note: git init, remote, .github tree, plans symlink, and initial commit
+  # Note: git init, remote, external AI memory, and initial commit
   # are handled by the scaffolding-project skill — copier focuses on file rendering.

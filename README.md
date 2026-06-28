@@ -1,102 +1,115 @@
 # scaffold-templates
 
-[Copier](https://copier.readthedocs.io/) templates I use to bootstrap personal projects, plus the Copilot skill that drives them. One subdirectory per language.
+Reusable [Copier](https://copier.readthedocs.io/) templates for bootstrapping projects with consistent defaults. The repository contains the templates and the optional global AI-agent skills that drive them; generated projects do not vendor those skills.
 
-## Available templates
+## Templates
 
-| Template | Status | Description |
-|---|---|---|
-| [`go/`](./go) | v3 | Go services and libraries. REST + gRPC, single-module or multi-service workspace, atlas migrations, OTel, testcontainers integration tests. Mirrors my production layout. |
-| `node/` | planned | TypeScript/Node.js services. |
-| `python/` | planned | Python services. |
+| Path | Status | Scope |
+|---|---:|---|
+| [`go/`](./go) | v3 | Go services, CLIs, libraries, GraphQL, gRPC, multi-service workspaces, Atlas migrations, OTel, and testcontainers-based integration tests. |
+| `node/` | planned | TypeScript/Node.js projects. |
+| `python/` | planned | Python projects. |
 
-## Requirements
+## Design Rules
 
-- [Copier](https://copier.readthedocs.io/) ≥ 9 (`uv tool install copier` or `pipx install copier`)
-- `git`, plus the language toolchain
+- A clean clone must work without sibling repositories, absolute local paths, or machine-specific symlinks.
+- AI skills are installed globally per agent/provider. They are not copied or linked into generated projects.
+- Generated projects should not assume a specific AI vendor. Provider-specific files and local skill links are left to the developer's environment.
+- `.github/` is not used as a fixed AI configuration surface. If a generated project later needs GitHub-native files, they should be real project files such as workflows, not links to a local AI config checkout.
 
-## Cloning this repo
+## Install Global Scaffold Skills
 
-This repo uses shared `.github` symlinks into [`ai-config`](https://github.com/) so the full set of personal Copilot skills is auto-loaded by Copilot CLI when you work here. Clone with:
+The `skills/` directory contains optional workflow skills for AI agents:
 
-```bash
-git clone git@github.com-<your-github-user>:<your-github-user>/scaffold-templates.git
-```
+- `scaffolding-project`
+- `maintaining-scaffold`
 
-Skills loaded when you open Copilot CLI in this repo:
-
-- `.github/skills/` — linked from `ai-config` (planning, committing, reviewing, testing, writing-modern-go, etc.)
-- `skills/` — local scaffold skills (`scaffolding-project`, `maintaining-scaffold`); `scripts/install.sh` symlinks both into `~/.copilot/skills/` so they're available in any cwd.
-
-## Creating a new repo
-
-> Replace `<your-github-user>` below with your GitHub username (the account that owns your fork of this repo). The scripts also read it from the `GITHUB_USER` env var.
-
-Three ways to bootstrap a new project, from highest to lowest level.
-
-### 1. Copilot CLI skill (recommended)
-
-Install once per machine:
+Install them globally for the provider you use:
 
 ```bash
-export GITHUB_USER=<your-github-user>
-bash <(curl -fsSL https://raw.githubusercontent.com/$GITHUB_USER/scaffold-templates/main/scripts/install.sh)
+git clone https://github.com/<owner>/scaffold-templates.git
+cd scaffold-templates
+./scripts/install.sh --provider codex
 ```
 
-The installer clones this repo and symlinks the `scaffolding-project` skill into `~/.copilot/skills/`. Then, to create a new repo:
+Supported providers:
+
+```bash
+./scripts/install.sh --provider codex
+./scripts/install.sh --provider copilot
+./scripts/install.sh --provider all
+AI_SKILLS_DIR=/path/to/skills ./scripts/install.sh --provider custom
+```
+
+For a one-line install from a remote script, provide the repository owner or URL:
+
+```bash
+SCAFFOLD_TEMPLATES_REPO=<owner>/scaffold-templates \
+  bash <(curl -fsSL https://raw.githubusercontent.com/<owner>/scaffold-templates/main/scripts/install.sh) --provider codex
+```
+
+The installer uses symlinks from the global skills directory back to this checkout. To update the skills, pull the repository and rerun the installer, or run `scripts/sync-skill.sh`.
+
+## Generate A Project
+
+### Through The Global Skill
+
+Open your AI agent in the target project root and ask it to scaffold the project. This can be a new empty directory or an already-created git repository with no project files yet.
+
+The skill prompts for the language and Copier answers, runs the template into the current directory, configures git metadata when requested, and leaves AI-agent memory outside the generated repository.
+
+### Direct Copier Usage
+
+Run Copier from the repository that should receive the generated files:
 
 ```bash
 mkdir my-project && cd my-project
-copilot                       # start Copilot CLI in the empty directory
-> scaffold a new go project   # ask the skill in chat
+copier copy --trust "gh:<owner>/scaffold-templates/go" .
 ```
 
-The skill prompts for the language, runs copier, wires the shared `.github` links and `plans/` symlink, configures the `git@github.com-personal:<your-github-user>/<repo>.git` remote, and offers to do the initial commit + push. See [`SKILL.md`](./skills/scaffolding-project/SKILL.md) for the full procedure and prerequisites (SSH alias, `mise`, etc.).
-
-`scripts/sync-skill.sh` runs at the start of each invocation, so skill updates here flow to your machine without a manual reinstall.
-
-### 2. Copier directly (no Copilot)
+For an existing empty repository:
 
 ```bash
-mkdir my-project && cd my-project
-copier copy --trust "gh:<your-github-user>/scaffold-templates/go" .
+cd /path/to/my-project
+copier copy --trust "gh:<owner>/scaffold-templates/go" .
 ```
 
-Copier prompts for project name, module path, project type, and optional features. `--trust` is required because templates run post-render tasks (`go mod tidy`, dynamic dirs, etc.). After copier finishes you have to wire git/remote and the shared `.github` links manually — that's what the skill above automates.
+`--trust` is required because the template runs post-render tasks such as `go mod tidy` and conditional setup scripts.
 
-### 3. `mise` task (from a clone of this repo)
+### Local Mise Task
+
+From a clone of this repository:
 
 ```bash
-GITHUB_USER=<your-github-user> mise run -C ~/path/to/scaffold-templates scaffold my-project go
+GITHUB_OWNER=<owner> mise run scaffold my-project go
 ```
 
-Creates `my-project/` in your CWD and runs copier inside it.
+This renders into `./my-project` under the scaffold-templates checkout. Use direct Copier usage when the target repository already exists somewhere else.
 
-### Updating an existing project
+## Updating A Generated Project
 
-To re-apply the template after this repo evolves:
+Generated projects keep Copier metadata, so future template updates can be applied from inside the project:
 
 ```bash
 copier update
 ```
 
+Review the diff carefully. Template updates can touch build files, generated documentation, and project structure.
+
 ## Layout
 
-```
-go/                                Copier template for Go projects
-  copier.yml                       prompts, conditions, exclude rules, post-render tasks
-  template/                        Jinja-templated files
-.github/                           shared symlinks -> ai-config (auto-loaded by Copilot CLI)
-skills/
-  scaffolding-project/SKILL.md     personal skill: bootstraps new projects
-                                   (symlinked into ~/.copilot/skills/ by install.sh)
-  maintaining-scaffold/SKILL.md    project skill: evolve the templates themselves
-                                   (auto-loads when Copilot opens this repo via global symlink)
-scripts/
-  install.sh                       first-time setup on a new machine
-  sync-skill.sh                    keeps the installed skill in sync with upstream
-.mise/tasks/
-  scaffold.sh                      `mise run scaffold <name> <language>` wrapper
+```text
+.
+├── go/
+│   ├── copier.yml
+│   ├── template/
+│   └── _scripts/
+├── scripts/
+│   ├── install.sh
+│   └── sync-skill.sh
+└── skills/
+    ├── maintaining-scaffold/
+    └── scaffolding-project/
 ```
 
 ## License

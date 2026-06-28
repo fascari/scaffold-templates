@@ -19,7 +19,7 @@ This skill captures the workflow for evolving `<your-github-user>/scaffold-templ
 ## Reference Project
 
 The canonical reference for the **Go template** is `cashback-platform` at
-`/Users/felipeascari/personal/profissional/projects/cashback-platform/`.
+an existing production project supplied by the user.
 
 When in doubt about a pattern, **read cashback-platform first**:
 - `services/cashback-service-api/internal/` for service layout
@@ -33,8 +33,8 @@ But: **always strip project-specific bits** before porting. The scaffold must be
 ## Before Touching the Templates
 
 1. **Read the current decisions:**
-   - `$COPILOT_VAULT/scaffold-templates/architecture/decisions.md`
-   - Any prior session log in `$COPILOT_VAULT/scaffold-templates/logs/`
+   - `$AI_MEMORY_HOME/scaffold-templates/architecture/decisions.md` when configured
+   - Any prior session log in `$AI_MEMORY_HOME/scaffold-templates/logs/` when configured
 2. **Understand the current state:**
    - `copier.yml` — variables, prompts, `_exclude`, `_tasks`
    - `template/` — what's already there, what's conditional
@@ -42,13 +42,13 @@ But: **always strip project-specific bits** before porting. The scaffold must be
 3. **Render the current template** before editing, so you have a baseline:
    ```bash
    rm -rf /tmp/scaffold-baseline && mkdir -p /tmp/scaffold-baseline && cd /tmp/scaffold-baseline
-   copier copy --defaults --trust /Users/felipeascari/personal/profissional/projects/scaffold-templates/go .
+   copier copy --defaults --trust <path-to-scaffold-templates>/go .
    ```
 
 ## Decision Log Discipline
 
 Every non-trivial change must:
-1. **Append an ADR** to `$COPILOT_VAULT/scaffold-templates/architecture/decisions.md`.
+1. **Append an ADR** to `$AI_MEMORY_HOME/scaffold-templates/architecture/decisions.md` when AI memory is configured.
    Format: `## ADR-NNN (YYYY-MM-DD): Title — Status — Context — Considered — Decision — Rationale.`
 2. **Reference the ADR** in the commit message (e.g., `feat: add include_redis flag (ADR-009)`).
 3. **Save a session log** at the end via the global `checkpoint` skill.
@@ -90,7 +90,7 @@ Example: adding `include_redis` for projects that need Redis cache.
      copier copy --defaults --trust \
        --data project_name=test-redis \
        --data include_redis=$flag \
-       /Users/felipeascari/personal/profissional/projects/scaffold-templates/go .
+       <path-to-scaffold-templates>/go .
      go build ./... && echo "$flag OK"
    done
    ```
@@ -164,4 +164,4 @@ For each: render → `go build ./...` (when applicable) → `go vet ./...`.
 - chi docs: https://go-chi.io/
 - viper docs: https://github.com/spf13/viper
 - testcontainers-go: https://golang.testcontainers.org/
-- cashback-platform reference: `/Users/felipeascari/personal/profissional/projects/cashback-platform/`
+- Production reference project: use a path supplied by the user.
