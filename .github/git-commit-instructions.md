@@ -1,1 +1,0 @@
-../ai-config/git-commit-instructions.md

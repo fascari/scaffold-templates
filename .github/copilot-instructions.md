@@ -1,1 +1,0 @@
-../ai-config/copilot-instructions.md
