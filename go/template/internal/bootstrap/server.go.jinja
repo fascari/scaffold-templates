@@ -45,7 +45,7 @@ func New(ctx context.Context, cfg *config.Config) (*App, func(), error) {
 	}
 {% endif %}
 {% if include_db %}
-	db, err := NewDB(ctx, cfg)
+	db, err := newDB(ctx, cfg)
 	if err != nil {
 		return nil, nil, fmt.Errorf("setup database: %w", err)
 	}
@@ -57,16 +57,16 @@ func New(ctx context.Context, cfg *config.Config) (*App, func(), error) {
 	})
 {% endif %}
 {% if include_db %}
-	app.router = NewRouter(db)
+		app.router = newRouter(db)
 {% else %}
-	app.router = NewRouter()
+		app.router = newRouter()
 {% endif %}
 	app.server = &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTP.Port),
 		Handler: app.router,
 	}
 {% if include_grpc %}
-	grpcServer, grpcCleanup := NewGRPCServer(cfg{% if include_otel %}, cfg.OTel.Enabled{% endif %})
+		grpcServer, grpcCleanup := newGRPCServer(cfg{% if include_otel %}, cfg.OTel.Enabled{% endif %})
 	app.grpcServer = grpcServer
 	cleanupFuncs = append(cleanupFuncs, grpcCleanup)
 {% endif %}

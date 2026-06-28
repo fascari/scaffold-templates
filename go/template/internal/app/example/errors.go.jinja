@@ -4,7 +4,7 @@ import "{{ module_path }}/pkg/apperror"
 
 const ErrCodeNotFound = "example_not_found"
 
-// NewErrNotFound returns an apperror for a missing example entity.
-func NewErrNotFound(id uint) error {
+// NotFound returns an apperror for a missing example entity.
+func NotFound(id uint) error {
 	return apperror.New(ErrCodeNotFound, "example with id %d not found", id)
 }

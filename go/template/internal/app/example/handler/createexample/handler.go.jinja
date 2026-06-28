@@ -33,18 +33,18 @@ func (h Handler) Handle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := payload.Validate(); err != nil {
+	if err := payload.validate(); err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	created, err := h.useCase.Execute(r.Context(), payload.ToDomain())
+	created, err := h.useCase.Execute(r.Context(), payload.toDomain())
 	if err != nil {
 		handleError(w, err)
 		return
 	}
 
-	pkghttp.WriteJSON(w, http.StatusCreated, ToOutputPayload(created))
+	pkghttp.WriteJSON(w, http.StatusCreated, toOutputPayload(created))
 }
 
 func handleError(w http.ResponseWriter, err error) {

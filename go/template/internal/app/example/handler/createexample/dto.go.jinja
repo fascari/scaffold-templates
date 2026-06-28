@@ -16,15 +16,15 @@ type (
 	}
 )
 
-func (p InputPayload) Validate() error {
+func (p InputPayload) validate() error {
 	return validator.Validate(p)
 }
 
-func (p InputPayload) ToDomain() domain.Example {
+func (p InputPayload) toDomain() domain.Example {
 	return domain.Example{Name: p.Name}
 }
 
-func ToOutputPayload(e domain.Example) OutputPayload {
+func toOutputPayload(e domain.Example) OutputPayload {
 	return OutputPayload{
 		ID:   e.ID,
 		Name: e.Name,

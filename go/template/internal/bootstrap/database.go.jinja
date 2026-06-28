@@ -10,8 +10,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// NewDB creates a new database connection via the database package.
-func NewDB(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
+// newDB creates a new database connection via the database package.
+func newDB(ctx context.Context, cfg *config.Config) (*gorm.DB, error) {
 	db, err := database.ConnectPostgres(cfg.Database)
 	if err != nil {
 		return nil, fmt.Errorf("setup database: %w", err)

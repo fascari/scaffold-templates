@@ -16,12 +16,12 @@ import (
 {% endif %}
 )
 
-// NewRouter creates and configures the HTTP router with all middleware and domain modules.
+// newRouter creates and configures the HTTP router with all middleware and domain modules.
 {% if include_db %}
-func NewRouter(db *gorm.DB) chi.Router {
+func newRouter(db *gorm.DB) chi.Router {
 	exampleModule := modules.NewExampleModule(db)
 {% else %}
-func NewRouter() chi.Router {
+func newRouter() chi.Router {
 	exampleModule := modules.NewExampleModule()
 {% endif %}
 	r := chi.NewRouter()

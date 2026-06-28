@@ -26,7 +26,7 @@ APP_LOG_FORMAT=json  # json or text
 Every HTTP request gets a unique ID injected into context:
 
 ```go
-requestID := middleware.GetRequestID(ctx)
+requestID := middleware.RequestIDFromContext(ctx)
 slog.InfoContext(ctx, "processing request",
     slog.String("request_id", requestID))
 ```

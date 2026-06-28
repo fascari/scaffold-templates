@@ -13,8 +13,8 @@ import (
 {% endif %}
 )
 
-// NewGRPCServer creates a new gRPC server with optional telemetry.
-func NewGRPCServer(cfg *config.Config{% if include_otel %}, otelEnabled bool{% endif %}) (*grpc.Server, func()) {
+// newGRPCServer creates a new gRPC server with optional telemetry.
+func newGRPCServer(cfg *config.Config{% if include_otel %}, otelEnabled bool{% endif %}) (*grpc.Server, func()) {
 	opts := []grpc.ServerOption{}
 {% if include_otel %}
 	if otelEnabled {

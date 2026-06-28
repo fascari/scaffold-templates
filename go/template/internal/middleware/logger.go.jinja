@@ -22,7 +22,7 @@ func Logger() func(next http.Handler) http.Handler {
 					Int("status", ww.Status()).
 					Int("bytes", ww.BytesWritten()).
 					Dur("duration", time.Since(start)).
-					Str("request_id", GetRequestID(r.Context())).
+					Str("request_id", RequestIDFromContext(r.Context())).
 					Msg("http request")
 			}()
 
