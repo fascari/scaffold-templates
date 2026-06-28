@@ -1,68 +1,96 @@
 #!/usr/bin/env bash
-# Sync the locally-installed scaffolding-project skill with the upstream
-# version in github.com/${GITHUB_USER}/scaffold-templates.
-#
-# Behavior:
-#   - If the skill is installed via symlink to a clone of scaffold-templates,
-#     git-pull the clone (fast-forward only).
-#   - If the skill is installed as a copy (no symlink), fetch the upstream
-#     SKILL.md via curl and overwrite the local file when it differs.
-#   - If the skill is not installed at all, exit with code 0 and a hint.
-#
-# Flags:
-#   --quiet     suppress informational output (errors still printed)
-#
-# Usage:
-#   GITHUB_USER=<your-github-user> bash <(curl -fsSL https://raw.githubusercontent.com/<your-github-user>/scaffold-templates/main/scripts/sync-skill.sh)
-#   bash sync-skill.sh --quiet
-
 set -euo pipefail
 
-QUIET=0
-[ "${1:-}" = "--quiet" ] && QUIET=1
+usage() {
+  cat <<'EOF'
+Usage:
+  ./scripts/sync-skill.sh [--provider codex|copilot|all|custom] [--quiet]
 
-log() { [ "$QUIET" = "1" ] || echo "$@"; }
-warn() { echo "WARN: $*" >&2; }
+Refreshes the local scaffold-templates clone used by globally installed skills.
+The skills are expected to be symlinks created by scripts/install.sh.
 
-GITHUB_USER="${GITHUB_USER:?set GITHUB_USER to your GitHub username}"
-SKILL_LINK="$HOME/.copilot/skills/scaffolding-project"
-UPSTREAM_RAW="https://raw.githubusercontent.com/${GITHUB_USER}/scaffold-templates/main/skills/scaffolding-project/SKILL.md"
+Environment:
+  CODEX_HOME      Codex home directory. Default: $HOME/.codex
+  AI_SKILLS_DIR   Target directory when --provider custom is used.
+EOF
+}
 
-if [ ! -e "$SKILL_LINK" ]; then
-  log "scaffolding-project skill is not installed at $SKILL_LINK"
-  log "run: GITHUB_USER=${GITHUB_USER} bash <(curl -fsSL https://raw.githubusercontent.com/${GITHUB_USER}/scaffold-templates/main/scripts/install.sh)"
-  exit 0
-fi
+provider="codex"
+quiet=0
 
-if [ -L "$SKILL_LINK" ]; then
-  TARGET="$(readlink "$SKILL_LINK")"
-  # symlink -> $REPO/skills/scaffolding-project; repo root is two levels up
-  REPO_ROOT="$(cd "$(dirname "$TARGET")/.." 2>/dev/null && pwd || true)"
-  if [ -n "$REPO_ROOT" ] && [ -d "$REPO_ROOT/.git" ]; then
-    log "==> syncing skill via git pull in $REPO_ROOT"
-    if git -C "$REPO_ROOT" pull --ff-only 2>/dev/null; then
-      log "    up to date."
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --provider)
+      provider="${2:?missing provider after --provider}"
+      shift 2
+      ;;
+    --quiet)
+      quiet=1
+      shift
+      ;;
+    --help|-h)
+      usage
       exit 0
-    else
-      warn "git pull failed; skill may be stale"
-      exit 0
-    fi
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
+log() {
+  if [[ "$quiet" -eq 0 ]]; then
+    echo "$@" >&2
   fi
-fi
+}
 
-log "==> syncing skill via raw fetch"
-TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+targets=()
+case "$provider" in
+  codex)
+    targets+=("${CODEX_HOME:-$HOME/.codex}/skills")
+    ;;
+  copilot)
+    targets+=("$HOME/.copilot/skills")
+    ;;
+  all)
+    targets+=("${CODEX_HOME:-$HOME/.codex}/skills")
+    targets+=("$HOME/.copilot/skills")
+    ;;
+  custom)
+    targets+=("${AI_SKILLS_DIR:?set AI_SKILLS_DIR when using --provider custom}")
+    ;;
+  *)
+    echo "Unsupported provider: $provider" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
 
-if ! curl -fsSL "$UPSTREAM_RAW" -o "$TMP"; then
-  warn "could not fetch upstream SKILL.md (offline?); keeping local version"
+repos=()
+for target_dir in "${targets[@]}"; do
+  for skill_name in scaffolding-project maintaining-scaffold; do
+    link_path="$target_dir/$skill_name"
+    if [[ ! -L "$link_path" ]]; then
+      continue
+    fi
+
+    skill_path="$(readlink "$link_path")"
+    repo_root="$(cd "$skill_path/../.." 2>/dev/null && pwd -P || true)"
+    if [[ -n "$repo_root" && -d "$repo_root/.git" ]]; then
+      repos+=("$repo_root")
+    fi
+  done
+done
+
+if [[ "${#repos[@]}" -eq 0 ]]; then
+  log "No scaffold-templates skill symlinks found. Run scripts/install.sh first."
   exit 0
 fi
 
-LOCAL="$SKILL_LINK/SKILL.md"
-if [ -f "$LOCAL" ] && cmp -s "$LOCAL" "$TMP"; then
-  log "    up to date."
-else
-  cp "$TMP" "$LOCAL"
-  log "    SKILL.md updated."
-fi
+mapfile -t unique_repos < <(printf '%s\n' "${repos[@]}" | sort -u)
+for repo_root in "${unique_repos[@]}"; do
+  log "Updating $repo_root"
+  git -C "$repo_root" pull --ff-only
+done
